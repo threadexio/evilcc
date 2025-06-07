@@ -1,4 +1,4 @@
-CFLAGS := -Wall -Wextra -fPIE -pie -fstack-protector-all -D_FORTIFY_SOURCE=2 -g3 -D__EVILCC_PROMOTE_UID -D__EVILCC_PROMOTE_GID
+CFLAGS := -Wall -Wextra -fPIE -pie -fstack-protector-all -D_FORTIFY_SOURCE=2 -g3 -D__EVILCC_PROMOTE_UID -D__EVILCC_PROMOTE_GID -D__EVILCC_DISABLE_ASLR -D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL
 LFLAGS := -Wl,-z,now -Wl,-z,relro
 
 all: main main2
