@@ -98,7 +98,6 @@ always_inline static syscall2(__NR_stat, int, _stat, const char*, pathname, stru
 always_inline static syscall3(__NR_execve, int, _execve, const char*, pathname, const char**, argv, const char**, envp);
 always_inline static syscall3(__NR_setresgid, int, _setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid);
 always_inline static syscall3(__NR_setresuid, int, _setresuid, uid_t, ruid, uid_t, euid, uid_t, suid);
-// always_inline static syscall3(__NR_write, ssize_t, _write, int, fd, const void*, buf, size_t, len);
 always_inline static syscall5(__NR_prctl, int, _prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5);
 
 #define getegid() _getegid()
@@ -111,7 +110,6 @@ always_inline static syscall5(__NR_prctl, int, _prctl, int, option, unsigned lon
 #define execve(pathname, argv, envp) _execve(pathname, argv, envp)
 #define setresgid(rgid, egid, sgid) _setresgid(rgid, egid, sgid)
 #define setresuid(ruid, euid, suid) _setresuid(ruid, euid, suid)
-// #define write(fd, buf, len) _write(fd, buf, len)
 #define prctl(option, arg2, arg3, arg4, arg5) _prctl(option, arg2, arg3, arg4, arg5)
 
 #define chmodme(mode) chmod("/proc/self/exe", mode)
