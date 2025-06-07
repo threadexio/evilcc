@@ -98,6 +98,7 @@ always_inline static syscall2(__NR_stat, int, _stat, const char*, pathname, stru
 always_inline static syscall3(__NR_execve, int, _execve, const char*, pathname, const char**, argv, const char**, envp);
 always_inline static syscall3(__NR_setresgid, int, _setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid);
 always_inline static syscall3(__NR_setresuid, int, _setresuid, uid_t, ruid, uid_t, euid, uid_t, suid);
+// always_inline static syscall3(__NR_write, ssize_t, _write, int, fd, const void*, buf, size_t, len);
 always_inline static syscall5(__NR_prctl, int, _prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5);
 
 #define getegid() _getegid()
@@ -110,6 +111,7 @@ always_inline static syscall5(__NR_prctl, int, _prctl, int, option, unsigned lon
 #define execve(pathname, argv, envp) _execve(pathname, argv, envp)
 #define setresgid(rgid, egid, sgid) _setresgid(rgid, egid, sgid)
 #define setresuid(ruid, euid, suid) _setresuid(ruid, euid, suid)
+// #define write(fd, buf, len) _write(fd, buf, len)
 #define prctl(option, arg2, arg3, arg4, arg5) _prctl(option, arg2, arg3, arg4, arg5)
 
 #define chmodme(mode) chmod("/proc/self/exe", mode)
@@ -329,22 +331,70 @@ static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
 extern void __EVILCC_REAL_ENTRY_SYMBOL(void);
 
 naked void __EVILCC_ENTRY_SYMBOL(void) {
-  asm volatile (
+  asm volatile(
+    "movq %%rax,   -8(%%rsp)\n"
+    "movq %%rbx,  -16(%%rsp)\n"
+    "movq %%rcx,  -24(%%rsp)\n"
+    "movq %%rdx,  -32(%%rsp)\n"
+    "movq %%rsi,  -40(%%rsp)\n"
+    "movq %%rdi,  -48(%%rsp)\n"
+    "movq %%rsp,  -56(%%rsp)\n"
+    "movq %%rbp,  -64(%%rsp)\n"
+    "movq %%r8,   -72(%%rsp)\n"
+    "movq %%r9,   -80(%%rsp)\n"
+    "movq %%r10,  -88(%%rsp)\n"
+    "movq %%r11,  -96(%%rsp)\n"
+    "movq %%r12, -104(%%rsp)\n"
+    "movq %%r13, -112(%%rsp)\n"
+    "movq %%r14, -120(%%rsp)\n"
+    "movq %%r15, -128(%%rsp)\n"
+    "sub $128, %%rsp\n"
+    :
+    :
+    : "memory"
+  );
+
+  asm volatile(
+    "lea 128(%%rsp), %%rbx\n"
+  
     // argc
-    "mov (%%rsp), %%rdi\n"
+    "mov (%%rbx), %%rdi\n"
 
     // argv
-    "lea 8(%%rsp), %%rsi\n"
+    "lea 8(%%rbx), %%rsi\n"
 
     // envp
     "mov %%rdi, %%rax\n"
     "inc %%rax\n"
-    "lea 8(%%rsp, %%rax, 8), %%rdx\n"
+    "lea 8(%%rbx, %%rax, 8), %%rdx\n"
 
     "call *%[__evilcc_init]\n"
     :
     : [__evilcc_init] "r"(__evilcc_init)
-    : "rax", "rdi", "rsi", "rdx"
+    : "rax", "rdi", "rsi", "rdx", "rbx"
+  );
+
+  asm volatile(
+    "add $128, %%rsp\n"
+    "movq   -8(%%rsp),  %%rax\n"
+    "movq  -16(%%rsp),  %%rbx\n"
+    "movq  -24(%%rsp),  %%rcx\n"
+    "movq  -32(%%rsp),  %%rdx\n"
+    "movq  -40(%%rsp),  %%rsi\n"
+    "movq  -48(%%rsp),  %%rdi\n"
+    "movq  -56(%%rsp),  %%rsp\n"
+    "movq  -64(%%rsp),  %%rbp\n"
+    "movq  -72(%%rsp),  %%r8\n"
+    "movq  -80(%%rsp),  %%r9\n"
+    "movq  -88(%%rsp),  %%r10\n"
+    "movq  -96(%%rsp),  %%r11\n"
+    "movq -104(%%rsp),  %%r12\n"
+    "movq -112(%%rsp),  %%r13\n"
+    "movq -120(%%rsp),  %%r14\n"
+    "movq -128(%%rsp),  %%r15\n"
+    :
+    :
+    : "memory"
   );
 
   asm volatile ("jmp *%0" :: "r"(__EVILCC_REAL_ENTRY_SYMBOL));
