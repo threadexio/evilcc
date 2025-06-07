@@ -207,7 +207,7 @@ always_inline static void die() {
 #define __EVILCC_DROP_SUGID_CHMOD 2
 
 #if !defined(__EVILCC_DROP_SUGID_METHOD)
-  #error "__EVILCC_DROP_SUGID_METHOD not specified"
+  #error "__EVILCC_DROP_SUGID_METHOD not specified, see the docs"
 
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
 
