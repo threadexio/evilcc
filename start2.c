@@ -124,7 +124,7 @@ always_inline static void die() {
 #define __EVILCC
 
 ///////////////////////////////////////////////////////////////////////////////
-// Promote effective r{uid,gid} to e{uid,gid}.
+// General functionality toggles.
 ///////////////////////////////////////////////////////////////////////////////
 
 // The following macros are used to control whether to promote the real (and
@@ -137,10 +137,16 @@ always_inline static void die() {
 //  * __EVILCC_PROMOTE_GID
 //
 //    Promote the real gid to the effective gid.
+//
+//  * __EVILCC_DISABLE_ASLR
+//
+//    Run the program with `ADDR_NO_RANDOMIZE`.
 
 ///////////////////////////////////////////////////////////////////////////////
-// Drop privs
+// Drop setuid/setgid bits. (only relevant if `__EVILCC_DISABLE_ASLR`)
 ///////////////////////////////////////////////////////////////////////////////
+
+#if defined(__EVILCC_DISABLE_ASLR)
 
 // The kernel silently discards `ADDR_NO_RANDOMIZE` from the personality of
 // setuid/setgid binaries. This means we cannot just set `ADDR_NO_RANDOMIZE`
@@ -150,7 +156,7 @@ always_inline static void die() {
 
 // 1. By using `prctl`.
 //
-//        `-D__EVILCC_DROP_PRIVS_METHOD=__EVILCC_DROP_PRIVS_PRCTL`
+//        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL`
 //
 //    Before re-executing we set the `NO_NEW_PRIVS` flag that tells the kernel
 //    not to respect setuid/setgid bits when executing other programs (including
@@ -164,11 +170,11 @@ always_inline static void die() {
 //
 //    If your program does not need such functionality, you should really use
 //    this method.
-#define __EVILCC_DROP_PRIVS_PRCTL 1
+#define __EVILCC_DROP_SUGID_PRCTL 1
 
 // 2. By using `chmod`.
 //
-//        `-D__EVILCC_DROP_PRIVS_METHOD=__EVILCC_DROP_PRIVS_CHMOD`
+//        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_CHMOD`
 //
 //    Before re-executing we use `chmod` to unset the setuid/setgid bits
 //    from our binary, then we `execve` our own binary (which is now not
@@ -177,12 +183,16 @@ always_inline static void die() {
 //
 //    If using this method, the following macros take effect:
 //
+//        `-D__EVILCC_IS_SETUID=1`
+//
 //     * __EVILCC_IS_SETUID
 //
 //       This instructs the code to re-set the setuid bit on startup. If you
 //       plan to have this binary as setuid, then define this.
 //
 //     * __EVILCC_IS_SETGID
+//
+//         `-D__EVILCC_IS_SETGID=1`
 //
 //       This instructs the code to re-set the setgid bit on startup. If you
 //       plan to have this binary as setgid, then define this. 
@@ -195,13 +205,24 @@ always_inline static void die() {
 //       that it is possible for another instance to be started in that time
 //       frame that does not work correctly because it doesn't have the correct
 //       setuid/setgid bits.
-#define __EVILCC_DROP_PRIVS_CHMOD 2
+#define __EVILCC_DROP_SUGID_CHMOD 2
 
-#if !defined(__EVILCC_DROP_PRIVS_METHOD)
-#error "__EVILCC_DROP_PRIVS_METHOD not specified"
-#elif __EVILCC_DROP_PRIVS_METHOD != __EVILCC_DROP_PRIVS_PRCTL \
-   && __EVILCC_DROP_PRIVS_METHOD != __EVILCC_DROP_PRIVS_CHMOD
-#error "unknown __EVILCC_DROP_PRIVS_METHOD, see the docs for available methods"
+#if !defined(__EVILCC_DROP_SUGID_METHOD)
+  #error "__EVILCC_DROP_SUGID_METHOD not specified"
+#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
+
+#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+  #if !defined(__EVILCC_IS_SETUID)
+    #error "__EVILCC_IS_SETUID not specified"
+  #endif
+
+  #if !defined(__EVILCC_IS_SETGID)
+    #error "__EVILCC_IS_SETGID not specified"
+  #endif
+#else
+#error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
+#endif
+
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -215,7 +236,8 @@ static void evil_init(int argc, const char* argv[], const char* envp[]) {
     uid_t euid = geteuid();
 
     if (ruid != euid)
-      setresuid(euid, euid, euid);
+      if (setresuid(euid, euid, euid) != 0)
+        die();
   }
 #endif
 
@@ -225,57 +247,60 @@ static void evil_init(int argc, const char* argv[], const char* envp[]) {
     gid_t egid = getegid();
 
     if (rgid != egid)
-      setresgid(egid, egid, egid);
+      if (setresgid(egid, egid, egid) != 0)
+        die();
   }
 #endif
 
-  struct stat stat = {0};
-  if (statme(&stat) != 0)
-    die();
-
-#if __EVILCC_DROP_PRIVS_METHOD == __EVILCC_DROP_PRIVS_CHMOD
-  // Re-set the SUID and SGID bits if needed.
+#if defined(__EVILCC_DISABLE_ASLR)
   {
-#if defined(__EVILCC_IS_SETUID)
-    stat.st_mode |= S_ISUID;
-#endif
-
-#if defined(__EVILCC_IS_SETGID)
-    stat.st_mode |= S_ISGID;
-#endif
-
-#if defined(__EVILCC_IS_SETUID) || defined(__EVILCC_IS_SETGID)
-    if (chmodme(stat.st_mode) != 0)
+    struct stat stat = {0};
+    if (statme(&stat) != 0)
       die();
-#endif
+
+    // Re-set the SUID and SGID bits if needed.
+    #if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+      #if __EVILCC_IS_SETUID == 1
+        stat.st_mode |= S_ISUID;
+      #endif
+
+      #if __EVILCC_IS_SETGID == 1
+        stat.st_mode |= S_ISGID;
+      #endif
+
+      #if __EVILCC_IS_SETUID == 1 || __EVILCC_IS_SETGID == 1
+        if (chmodme(stat.st_mode) != 0)
+          die();
+      #endif
+    #endif
+
+    int persona = personality(0xffffffff);
+    if (persona == -1)
+      die();
+
+    if ((persona & ADDR_NO_RANDOMIZE) == 0) {
+      if (personality(persona | ADDR_NO_RANDOMIZE) != 0)
+        die();
+
+      #if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
+        // Tell the kernel not to respect the setuid/setgid bits from now on.
+        //
+        // See the __EVILCC_DROP_SUGID_PRCTL docs for implications.
+        if (prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L) != 0)
+          die();
+      #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+        // Unset the problematic setuid and setgid bits temporarily.
+        //
+        // See the `__EVILCC_DROP_SUGID_CHMOD` docs for more.
+        if (chmodme(stat.st_mode & ~S_ISUID & ~S_ISGID) != 0)
+          die();
+      #endif
+
+      if (reexecve(argv, envp) != 0)
+        die();
+    }
   }
 #endif
-
-  int persona = personality(0xffffffff);
-  if (persona == -1)
-    die();
-
-  if ((persona & ADDR_NO_RANDOMIZE) == 0) {
-    if (personality(persona | ADDR_NO_RANDOMIZE) != 0)
-      die();
-
-#if __EVILCC_DROP_PRIVS_METHOD == __EVILCC_DROP_PRIVS_PRCTL
-    // Tell the kernel not to respect the setuid/setgid bits from now on.
-    //
-    // See the __EVILCC_DROP_PRIVS_PRCTL docs for implications.
-    if (prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L) != 0)
-      die();
-#elif __EVILCC_DROP_PRIVS_METHOD == __EVILCC_DROP_PRIVS_CHMOD
-    // Unset the problematic setuid and setgid bits temporarily.
-    //
-    // See the `__EVILCC_DROP_PRIVS_CHMOD` docs for more.
-    if (chmodme(stat.st_mode & ~S_ISUID & ~S_ISGID) != 0)
-      die();
-#endif
-
-    if (reexecve(argv, envp) != 0)
-      die();
-  }
 }
 
 extern void _start(void);
