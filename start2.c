@@ -127,8 +127,7 @@ always_inline static void die() {
 // General functionality toggles.
 ///////////////////////////////////////////////////////////////////////////////
 
-// The following macros are used to control whether to promote the real (and
-// saved) uid/gid to the effective uid/gid.
+// The following macros are used to enable functionality.
 //
 //  * __EVILCC_PROMOTE_UID
 //
@@ -209,6 +208,7 @@ always_inline static void die() {
 
 #if !defined(__EVILCC_DROP_SUGID_METHOD)
   #error "__EVILCC_DROP_SUGID_METHOD not specified"
+
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
 
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
@@ -219,6 +219,7 @@ always_inline static void die() {
   #if !defined(__EVILCC_IS_SETGID)
     #error "__EVILCC_IS_SETGID not specified"
   #endif
+
 #else
 #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
 #endif
