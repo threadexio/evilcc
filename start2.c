@@ -131,11 +131,11 @@ always_inline static void die() {
 //
 //  * __EVILCC_PROMOTE_UID
 //
-//    Promote the real uid to the effective uid.
+//    Promote the real (and saved) uid to the effective uid.
 //
 //  * __EVILCC_PROMOTE_GID
 //
-//    Promote the real gid to the effective gid.
+//    Promote the real (and saved) gid to the effective gid.
 //
 //  * __EVILCC_DISABLE_ASLR
 //
@@ -227,9 +227,31 @@ always_inline static void die() {
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
+// Advanced macros.
+///////////////////////////////////////////////////////////////////////////////
 
-static void evil_init(int argc, const char* argv[], const char* envp[]) {
+// Name of the entry symbol for evilcc.
+//
+// This should be the name of the symbol the linker will set as the entrypoint.
+// It must be the name of the symbol passed to the linker with `-Wl,-e"<name>"`.
+#if !defined(__EVILCC_ENTRY_SYMBOL)
+#define __EVILCC_ENTRY_SYMBOL __evilcc_entry
+#endif
+
+// Evilcc will jump to this symbol after it has finished its job.
+//
+// This should be the "real" entrypoint of the binary. The default is "_start"
+// and works fine.
+#if !defined(__EVILCC_REAL_ENTRY_SYMBOL)
+#define __EVILCC_REAL_ENTRY_SYMBOL _start
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
   (void)argc;
+  (void)argv;
+  (void)envp;
 
 #if defined(__EVILCC_PROMOTE_UID)
   {
@@ -304,9 +326,9 @@ static void evil_init(int argc, const char* argv[], const char* envp[]) {
 #endif
 }
 
-extern void _start(void);
+extern void __EVILCC_REAL_ENTRY_SYMBOL(void);
 
-naked void _start2(void) {
+naked void __EVILCC_ENTRY_SYMBOL(void) {
   asm volatile (
     // argc
     "mov (%%rsp), %%rdi\n"
@@ -319,11 +341,11 @@ naked void _start2(void) {
     "inc %%rax\n"
     "lea 8(%%rsp, %%rax, 8), %%rdx\n"
 
-    "call *%[evil_init]\n"
+    "call *%[__evilcc_init]\n"
     :
-    : [evil_init] "r"(evil_init)
+    : [__evilcc_init] "r"(__evilcc_init)
     : "rax", "rdi", "rsi", "rdx"
   );
 
-  asm volatile ("jmp *%[_start]" :: [_start] "r"(_start));
+  asm volatile ("jmp *%0" :: "r"(__EVILCC_REAL_ENTRY_SYMBOL));
 }

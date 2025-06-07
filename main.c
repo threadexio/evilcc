@@ -5,6 +5,8 @@
 #include <sys/personality.h>
 #include <unistd.h>
 
+void evilcc_init(void);
+
 int main() {
 	printf("Hello world!\n");
 
