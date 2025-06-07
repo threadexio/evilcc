@@ -4,7 +4,7 @@
 
 pkgs.mkShell {
   packages = with pkgs; [
-    gcc
+    gcc_multi
     gnumake
     patchelf
     entr
