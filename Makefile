@@ -1,9 +1,4 @@
-TARGET_UID ?= 0
-TARGET_GID ?= 0
-SETUID ?= 0
-SETGID ?= 0
-
-CFLAGS := -Wall -Wextra -fPIE -pie -fstack-protector-all -D_FORTIFY_SOURCE=2 -g3 -DTARGET_UID=$(TARGET_UID) -DTARGET_GID=$(TARGET_GID) -DSETUID=$(SETUID) -DSETGID=$(SETGID)
+CFLAGS := -Wall -Wextra -fPIE -pie -fstack-protector-all -D_FORTIFY_SOURCE=2 -g3 -D__EVILCC_DROP_PRIVS_METHOD=__EVILCC_DROP_PRIVS_PRCTL
 LFLAGS := -Wl,-z,now -Wl,-z,relro
 
 
