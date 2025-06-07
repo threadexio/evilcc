@@ -1,7 +1,5 @@
-#ifndef __EVILCC_COMMON_H
-#define __EVILCC_COMMON_H
-
-#define __EVILCC
+#ifndef __EVILCC_CONFIG_H
+#define __EVILCC_CONFIG_H
 
 ///////////////////////////////////////////////////////////////////////////////
 // General functionality toggles.
@@ -125,23 +123,5 @@
 #if !defined(__EVILCC_REAL_ENTRY_SYMBOL)
 #define __EVILCC_REAL_ENTRY_SYMBOL _start
 #endif
-
-///////////////////////////////////////////////////////////////////////////////
-
-#define stringify(x) stringify_(x)
-#define stringify_(x) #x
-
-#define naked __attribute__((naked))
-
-#if 1
-#define always_inline __attribute__((always_inline)) inline
-#else
-#define always_inline __attribute__((noinline))
-#endif
-
-extern void __EVILCC_REAL_ENTRY_SYMBOL(void);
-naked void __EVILCC_ENTRY_SYMBOL(void);
-
-void __evilcc_init(int argc, const char* argv[], const char* envp[]);
 
 #endif
