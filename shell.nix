@@ -9,6 +9,4 @@ pkgs.mkShell {
     patchelf
     entr
   ];
-
-  MAKE = "${pkgs.gnumake}/bin/make -j";
 }

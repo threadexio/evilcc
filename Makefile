@@ -14,4 +14,4 @@ test/main-i386: test/main.c src/arch/i386/evilcc.a
 
 .PRECIOUS: src/arch/%/evilcc.a
 src/arch/%/evilcc.a:
-	$(MAKE) -C src/ -B ARCH="$*"
+	$(MAKE) -C src/ ARCH=$* build

@@ -1,5 +1,4 @@
-ARCH := $(shell uname -m)
-
+ARCH ?= $(shell uname -m)
 V := 0
 
 ifeq ($(V),0)
@@ -18,27 +17,45 @@ include arch/$(ARCH)/build.mk
 objs-$(ARCH) := $(addprefix arch/$(ARCH)/,$(objs-$(ARCH)))
 override CFLAGS += $(cflags)
 
+arches := $(patsubst arch/%,%,$(wildcard arch/*))
+
+build-targets := $(addprefix build-,$(arches))
+clean-targets := $(addprefix clean-,$(arches))
+
 ###############################################################################
 
-all: arch/$(ARCH)/evilcc.a
+all: build
+
+.PHONY:
+build: arch/$(ARCH)/evilcc.a
+
+.PHONY:
+.NOTPARALLEL:
+build-all: $(build-targets)
+
+.PHONY:
+$(build-targets):
+	$(Q)$(MAKE) ARCH=${@:build-%=%} build
 
 ###############################################################################
 
-# Clean only the entire build tree.
 .PHONY:
 clean:
-	$(Q)rm -f $(target) $(objs) $(objs-$(ARCH))
+	@printf "  %-6s %s\n" "CLEAN" "$(ARCH)"
+	$(Q)rm -f arch/$(ARCH)/evilcc.a $(objs) $(objs-$(ARCH))
+
+.PHONY:
+clean-all: $(clean-targets)
+
+.PHONY:
+$(clean-targets):
+	$(Q)$(MAKE) ARCH=${@:clean-%=%} clean
 
 ###############################################################################
 
 arch/$(ARCH)/evilcc.a: $(objs) $(objs-$(ARCH))
 	@printf "  %-6s %s\n" "AR" "$@"
 	$(Q)$(AR) r $@ $^
-
-.PRECIOUS: arch/$(ARCH)/%.o
-arch/$(ARCH)/%.o: arch/$(ARCH)/%.c
-	@printf "  %-6s %s\n" "CC" "$@"
-	$(Q)$(CC) $(CFLAGS) -c $^ -o $@
 
 .PRECIOUS: %.o
 %.o: %.c
