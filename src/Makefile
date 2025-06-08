@@ -17,6 +17,8 @@ include arch/$(ARCH)/build.mk
 objs-$(ARCH) := $(addprefix arch/$(ARCH)/,$(objs-$(ARCH)))
 override CFLAGS += $(cflags)
 
+-include .config.mk
+
 arches := $(patsubst arch/%,%,$(wildcard arch/*))
 
 build-targets := $(addprefix build-,$(arches))
