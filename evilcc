@@ -50,17 +50,16 @@ usage() {
 
 SYSROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-cc=
+cc=""
 cc_flags=()
 cc_lflags=()
 
-out=
-arch=$(uname -m)
+out=""
+arch="$(uname -m)"
 is_linking=1
-promote_uid=
-promote_gid=
-disable_aslr=
-disable_aslr_method=
+promote_uid=0
+promote_gid=0
+disable_aslr=""
 is_setuid=0
 is_setgid=0
 
@@ -87,10 +86,8 @@ while [ ! -z "${1:-}" ]; do
       ;;
 
     --disable-aslr)
-      disable_aslr=1
-      
       [ -z "${2:-}" ] && fatal "--disable-alsr needs a method"
-      disable_aslr_method="$2"
+      disable_aslr="$2"
       shift 2
       ;;
 
@@ -146,44 +143,44 @@ fi
 
 evilcc_cflags=()
 
-if [ ! -z "$promote_uid" ]; then
+if [ "$promote_uid" -eq 1 ]; then
   evilcc_cflags+=("-D__EVILCC_PROMOTE_UID")
 fi
 
-if [ ! -z "$promote_gid" ]; then
+if [ "$promote_gid" -eq 1 ]; then
   evilcc_cflags+=("-D__EVILCC_PROMOTE_GID")
 fi
 
-if [ ! -z "$disable_aslr" ]; then
-  evilcc_cflags+=("-D__EVILCC_DISABLE_ASLR")
-
-  case "$disable_aslr_method" in
-    "prctl")
-      evilcc_cflags+=("-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL")
-      ;;
-    "chmod")
-      evilcc_cflags+=("-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_CHMOD")
-      evilcc_cflags+=("-D__EVILCC_IS_SETUID=$is_setuid")
-      evilcc_cflags+=("-D__EVILCC_IS_SETGID=$is_setgid")
-      ;;
-    *)
-      fatal "Invalid method for --disable-aslr, see --help."
-      ;;
-  esac
-fi
+case "$disable_aslr" in
+  "")
+    ;;
+  "prctl")
+    evilcc_cflags+=("-D__EVILCC_DISABLE_ASLR")
+    evilcc_cflags+=("-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL")
+    ;;
+  "chmod")
+    evilcc_cflags+=("-D__EVILCC_DISABLE_ASLR")
+    evilcc_cflags+=("-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_CHMOD")
+    evilcc_cflags+=("-D__EVILCC_IS_SETUID=$is_setuid")
+    evilcc_cflags+=("-D__EVILCC_IS_SETGID=$is_setgid")
+    ;;
+  *)
+    fatal "Invalid method for --disable-aslr, see --help."
+    ;;
+esac
 
 info "sysroot: $SYSROOT"
 
 evilcc_out="$(mktemp -d)"
 info "building evilcc in $evilcc_out"
-make -j -C "$SYSROOT/src" O="$evilcc_out" ARCH="$arch" CFLAGS="${evilcc_cflags[*]}" build
+make -j -C "$SYSROOT/src" O="$evilcc_out" ARCH="$arch" CFLAGS="${evilcc_cflags[*]} ${CFLAGS:-}" V=1 build
 evilcc_archive="$evilcc_out/arch/$arch/evilcc.a"
 
 cc_lflags+=("-Wl,-e__evilcc_entry")
 
 info "cc flags: ${cc_flags[*]}"
 
-$cc "$evilcc_archive" "${cc_flags[@]}" "${cc_lflags[@]}"
+$cc "$evilcc_archive" "${cc_flags[@]}" "${CFLAGS:-}" "${cc_lflags[@]}"
 
 if [ ! -z "$out" ]; then
   info "resulting binary: $out"
