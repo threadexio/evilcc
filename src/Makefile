@@ -7,14 +7,17 @@ else
 Q :=
 endif
 
+O := .
+
 ###############################################################################
 
 # Load non-arch-specific objects, flags, etc.
 include build.mk
+objs := $(addprefix $(O)/,$(objs))
 
 # Load arch-specific objects, flags, etc.
 include arch/$(ARCH)/build.mk
-objs-$(ARCH) := $(addprefix arch/$(ARCH)/,$(objs-$(ARCH)))
+objs-$(ARCH) := $(addprefix $(O)/arch/$(ARCH)/,$(objs-$(ARCH)))
 override CFLAGS += $(cflags)
 
 -include .config.mk
@@ -29,7 +32,7 @@ clean-targets := $(addprefix clean-,$(arches))
 all: build
 
 .PHONY:
-build: arch/$(ARCH)/evilcc.a
+build: $(O)/arch/$(ARCH)/evilcc.a
 
 .PHONY:
 .NOTPARALLEL:
@@ -44,7 +47,7 @@ $(build-targets):
 .PHONY:
 clean:
 	@printf "  %-6s %s\n" "CLEAN" "$(ARCH)"
-	$(Q)rm -f arch/$(ARCH)/evilcc.a $(objs) $(objs-$(ARCH))
+	$(Q)rm -f $(O)/arch/$(ARCH)/evilcc.a $(objs) $(objs-$(ARCH))
 
 .PHONY:
 clean-all: $(clean-targets)
@@ -55,11 +58,13 @@ $(clean-targets):
 
 ###############################################################################
 
-arch/$(ARCH)/evilcc.a: $(objs) $(objs-$(ARCH))
+$(O)/arch/$(ARCH)/evilcc.a: $(objs) $(objs-$(ARCH))
 	@printf "  %-6s %s\n" "AR" "$@"
 	$(Q)$(AR) r $@ $^
 
 .PRECIOUS: %.o
-%.o: %.c
+$(O)/%.o: %.c
 	@printf "  %-6s %s\n" "CC" "$@"
+	@mkdir -p $(dir $@)
 	$(Q)$(CC) $(CFLAGS) -c $^ -o $@
+

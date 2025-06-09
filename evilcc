@@ -41,7 +41,7 @@ usage() {
   printf "  %-30s %s\n" "" "  [methods: prctl, chmod]"
   printf "  %-30s %s\n" "--setuid" "Mark the resulting binary as setuid."
   printf "  %-30s %s\n" "--setgid" "Mark the resulting binary as setgid."
-  printf "  %-30s %s\n" "  ..." "Any other options for the underlying compiler"
+  printf "  %-30s %s\n" "  ..." "Any other options for the underlying compiler."
   printf "\n"
   printf "Environment variables:\n"
   printf "  %-10s %s\n" "_CC" "Path to the underlying C compiler."
@@ -174,8 +174,10 @@ fi
 
 info "sysroot: $SYSROOT"
 
-make -j -B -C "$SYSROOT/src" ARCH="$arch" CFLAGS="${evilcc_cflags[*]}" build
-evilcc_archive="$SYSROOT/src/arch/$arch/evilcc.a"
+evilcc_out="$(mktemp -d)"
+info "building evilcc in $evilcc_out"
+make -j -C "$SYSROOT/src" O="$evilcc_out" ARCH="$arch" CFLAGS="${evilcc_cflags[*]}" build
+evilcc_archive="$evilcc_out/arch/$arch/evilcc.a"
 
 cc_lflags+=("-Wl,-e__evilcc_entry")
 
