@@ -30,7 +30,7 @@
 // and re-execute ourselves. We have to do a little dance to somehow re-execute
 // without the setuid/setgid bits. Currently there are 2 supported ways to do
 // this.
-
+//
 // 1. By using `prctl`.
 //
 //        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL`
@@ -60,7 +60,7 @@
 //
 //    If using this method, the following macros take effect:
 //
-//        `-D__EVILCC_IS_SETUID=1`
+//        `-D__EVILCC_IS_SETUID`
 //
 //     * __EVILCC_IS_SETUID
 //
@@ -69,7 +69,7 @@
 //
 //     * __EVILCC_IS_SETGID
 //
-//         `-D__EVILCC_IS_SETGID=1`
+//         `-D__EVILCC_IS_SETGID`
 //
 //       This instructs the code to re-set the setgid bit on startup. If you
 //       plan to have this binary as setgid, then define this. 
@@ -86,18 +86,8 @@
 
 #if !defined(__EVILCC_DROP_SUGID_METHOD)
   #error "__EVILCC_DROP_SUGID_METHOD not specified, see the docs"
-
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
-
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
-  #if !defined(__EVILCC_IS_SETUID)
-    #error "__EVILCC_IS_SETUID not specified"
-  #endif
-
-  #if !defined(__EVILCC_IS_SETGID)
-    #error "__EVILCC_IS_SETGID not specified"
-  #endif
-
 #else
 #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
 #endif

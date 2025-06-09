@@ -1,5 +1,5 @@
-#include "../../compiler.h"
-#include "../../config.h"
+#include "compiler.h"
+#include "config.h"
 
 asm (
   ".text\n"

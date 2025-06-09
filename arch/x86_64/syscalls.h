@@ -7,7 +7,7 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
-#include "../../compiler.h"
+#include "compiler.h"
 
 #define syscall0(num, ret, name)                                              \
   ret name(void) {                                                            \

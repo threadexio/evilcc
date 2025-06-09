@@ -1,0 +1,1 @@
+cflags += -I. -Iinclude

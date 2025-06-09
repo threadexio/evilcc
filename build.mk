@@ -1,0 +1,1 @@
+cflags := -Wall -Wextra -fPIC
