@@ -24,43 +24,40 @@ void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#if defined(__EVILCC_PROMOTE_UID)
 
 always_inline static void promote_uid(void) {
+
+#if defined(__EVILCC_PROMOTE_UID)
   uid_t ruid = getuid();
   uid_t euid = geteuid();
 
   if (ruid != euid)
     if (setresuid(euid, euid, euid) != 0)
       die();
-}
-
-#else
-always_inline static void promote_uid(void) {}
 #endif
+
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#if defined(__EVILCC_PROMOTE_GID)
-
 always_inline static void promote_gid(void) {
+
+#if defined(__EVILCC_PROMOTE_GID)
   gid_t rgid = getgid();
   gid_t egid = getegid();
 
   if (rgid != egid)
     if (setresgid(egid, egid, egid) != 0)
       die();
-}
-
-#else
-always_inline static void promote_gid(void) {}
 #endif
+
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#if defined(__EVILCC_DISABLE_ASLR)
-
 always_inline static void disable_aslr(const char* argv[], const char* envp[]) {
+
+#if defined(__EVILCC_DISABLE_ASLR)
   struct stat stat = {0};
   if (statme(&stat) != 0)
     die();
@@ -106,10 +103,8 @@ always_inline static void disable_aslr(const char* argv[], const char* envp[]) {
     if (reexecve(argv, envp) != 0)
       die();
   }
-}
-
 #else
-always_inline static void disable_aslr(const char* argv[], const char* envp[]) {
   (void)argv; (void)envp;
-}
 #endif
+
+}
