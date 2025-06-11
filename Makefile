@@ -74,7 +74,7 @@ test/main-$(ARCH):
 
 $(O)/arch/$(ARCH)/evilcc.a: $(final-objs)
 	@printf "  %-6s %s\n" "AR" "${@:$(O)/%=%}"
-	$(Q)$(AR) r $@ $^
+	$(Q)$(AR) rcs $@ $^
 
 .PRECIOUS: %.o
 $(O)/%.o: %.c
