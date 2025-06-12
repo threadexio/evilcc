@@ -73,8 +73,13 @@ test/main-$(ARCH):
 ###############################################################################
 
 $(O)/arch/$(ARCH)/evilcc.a: $(final-objs)
+	@mkdir -p $(dir $@)
 	@printf "  %-6s %s\n" "AR" "${@:$(O)/%=%}"
 	$(Q)$(AR) rcs $@ $^
+	@printf "  %-6s %s\n" "STRIP" "${@:$(O)/%=%}"
+	$(Q)$(STRIP) -N __evilcc_init $@
+	@printf "  %-6s %s\n" "NM" "${@:$(O)/%=%}"
+	$(Q)$(NM) --extern-only --defined-only $@
 
 .PRECIOUS: %.o
 $(O)/%.o: %.c

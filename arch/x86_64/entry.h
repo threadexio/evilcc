@@ -1,3 +1,6 @@
+#ifndef __EVILCC_ARCH_X86_64_ENTRY_H
+#define __EVILCC_ARCH_X86_64_ENTRY_H
+
 #include "compiler.h"
 #include "config.h"
 
@@ -50,3 +53,5 @@ asm (
 
   "jmp " stringify(__EVILCC_REAL_ENTRY_SYMBOL) "\n"
 );
+
+#endif

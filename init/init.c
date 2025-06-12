@@ -1,7 +1,19 @@
-#include "init.h"
 #include "config.h"
-#include "arch.h"
 #include "compiler.h"
+
+used static void __evilcc_init(int argc, const char* argv[], const char* envp[]);
+
+#if defined(__x86_64__)
+#include "arch/x86_64/entry.h"
+#include "arch/x86_64/misc.h"
+#include "arch/x86_64/syscalls.h"
+#elif defined(__i386__)
+#include "arch/i386/entry.h"
+#include "arch/i386/misc.h"
+#include "arch/i386/syscalls.h"
+#else
+#error "unsupported architecture"
+#endif
 
 #define chmodme(mode) chmod("/proc/self/exe", mode)
 #define statme(statbuf) stat("/proc/self/exe", statbuf)
@@ -13,7 +25,7 @@ always_inline static void disable_aslr(const char* argv[], const char* envp[]);
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
+used static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
   (void)argc;
 
   // Order here matters.
