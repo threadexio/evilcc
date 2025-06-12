@@ -18,6 +18,17 @@
 //  * __EVILCC_DISABLE_ASLR
 //
 //    Run the program with `ADDR_NO_RANDOMIZE`.
+//
+//  * __EVILCC_SET_LD_PRELOAD
+//
+//    Run the program using a specified `LD_PRELOAD` or the one provided by the
+//    user.
+//
+//  * __EVILCC_FORCE_LD_PRELOAD
+//
+//    Run the program using a specified `LD_PRELOAD` without
+//    respecting the choice of the user. (This takes precedence over
+//    `__EVILCC_SET_LD_PRELOAD`)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Drop setuid/setgid bits. (only relevant if `__EVILCC_DISABLE_ASLR`)

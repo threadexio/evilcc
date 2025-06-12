@@ -33,7 +33,7 @@ int main(int argc, const char** argv, const char** envp) {
 	print_array(argv, argc);
 	printf("\n");
 	printf("envp: ");
-	print_array(envp, 2);
+	print_array(envp, 99);
 	printf("\n");
 	printf("\n");
 

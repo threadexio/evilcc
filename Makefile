@@ -1,3 +1,8 @@
+CC ?= cc
+AR ?= ar
+STRIP ?= strip
+NM ?= nm
+
 ARCH ?= $(shell uname -m)
 V := 0
 O := .
