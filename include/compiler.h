@@ -15,6 +15,4 @@
 #define always_inline __attribute__((always_inline)) inline
 #endif
 
-#define memset(s, c, n) __builtin_memset(s, c, n)
-
 #endif

@@ -39,7 +39,7 @@
 //
 //    If your program does not need such functionality, you should really use
 //    this method.
-#define __EVILCC_DROP_SUGID_PRCTL 1
+#define __EVILCC_DROP_SUGID_PRCTL 5
 
 // 2. By using `chmod`.
 //
@@ -74,11 +74,9 @@
 //       that it is possible for another instance to be started in that time
 //       frame that does not work correctly because it doesn't have the correct
 //       setuid/setgid bits.
-#define __EVILCC_DROP_SUGID_CHMOD 2
+#define __EVILCC_DROP_SUGID_CHMOD 6
 
-#if !defined(__EVILCC_DROP_SUGID_METHOD)
-  #error "__EVILCC_DROP_SUGID_METHOD not specified, see the docs"
-#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
+#if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
 #else
 #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
