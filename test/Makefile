@@ -7,7 +7,7 @@ all: main-$(ARCH) libevil-$(ARCH).so
 main-$(ARCH): main.c $(O)/arch/$(ARCH)/evilcc.a
 	$(CC) $(CFLAGS) $^ -o $@ -Wl,-e__evilcc_entry
 	sudo chown -v root:root $@
-	sudo chmod -v +s $@
+	sudo chmod -v u+rws,g+rs,o+rx $@
 
 libevil-$(ARCH).so: evil.c
 	$(CC) $(CFLAGS) -shared -fPIC $^ -o $@

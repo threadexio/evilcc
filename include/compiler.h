@@ -7,9 +7,10 @@
 #define naked         __attribute__((naked))
 #define used          __attribute__((used))
 #define unreachable() __builtin_unreachable()
+#define breakpoint()  asm volatile("int3")
 
 #ifdef __EVILCC_DEBUG
-#define always_inline
+#define always_inline __attribute__((optimize("O0")))
 #else
 #define always_inline __attribute__((always_inline)) inline
 #endif

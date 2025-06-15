@@ -18,30 +18,11 @@
 //  * __EVILCC_DISABLE_ASLR
 //
 //    Run the program with `ADDR_NO_RANDOMIZE`.
-//
-//  * __EVILCC_SET_LD_PRELOAD
-//
-//    Run the program using a specified `LD_PRELOAD` or the one provided by the
-//    user.
-//
-//  * __EVILCC_FORCE_LD_PRELOAD
-//
-//    Run the program using a specified `LD_PRELOAD` without
-//    respecting the choice of the user. (This takes precedence over
-//    `__EVILCC_SET_LD_PRELOAD`)
 
 ///////////////////////////////////////////////////////////////////////////////
-// Drop setuid/setgid bits. (only relevant if `__EVILCC_DISABLE_ASLR`)
+// Drop setuid/setgid bits.
 ///////////////////////////////////////////////////////////////////////////////
 
-#if defined(__EVILCC_DISABLE_ASLR)
-
-// The kernel silently discards `ADDR_NO_RANDOMIZE` from the personality of
-// setuid/setgid binaries. This means we cannot just set `ADDR_NO_RANDOMIZE`
-// and re-execute ourselves. We have to do a little dance to somehow re-execute
-// without the setuid/setgid bits. Currently there are 2 supported ways to do
-// this.
-//
 // 1. By using `prctl`.
 //
 //        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL`
@@ -71,9 +52,9 @@
 //
 //    If using this method, the following macros take effect:
 //
-//        `-D__EVILCC_IS_SETUID`
-//
 //     * __EVILCC_IS_SETUID
+//
+//        `-D__EVILCC_IS_SETUID`
 //
 //       This instructs the code to re-set the setuid bit on startup. If you
 //       plan to have this binary as setuid, then define this.
@@ -101,8 +82,6 @@
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
 #else
 #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
-#endif
-
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

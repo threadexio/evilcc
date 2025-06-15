@@ -4,6 +4,8 @@
 #include "compiler.h"
 #include "config.h"
 
+used static void __evilcc_init(int argc, const char* argv[], const char* envp[]);
+
 asm (
   ".text\n"
   ".globl " stringify(__EVILCC_ENTRY_SYMBOL) "\n"

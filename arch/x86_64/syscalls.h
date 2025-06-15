@@ -4,6 +4,7 @@
 #include <sys/personality.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
+#include <sys/signal.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 
@@ -89,22 +90,26 @@ always_inline static syscall0(__NR_getgid, gid_t, _getgid);
 always_inline static syscall0(__NR_getuid, uid_t, _getuid);
 always_inline static syscall1(__NR_personality, int, _personality, unsigned long, persona);
 always_inline static syscall2(__NR_chmod, int, _chmod, const char*, pathname, mode_t, mode);
+always_inline static syscall2(__NR_kill, int, _kill, pid_t, pid, int, sig);
 always_inline static syscall2(__NR_stat, int, _stat, const char*, pathname, struct stat*, statbuf);
 always_inline static syscall3(__NR_execve, int, _execve, const char*, pathname, const char**, argv, const char**, envp);
 always_inline static syscall3(__NR_setresgid, int, _setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid);
 always_inline static syscall3(__NR_setresuid, int, _setresuid, uid_t, ruid, uid_t, euid, uid_t, suid);
+always_inline static syscall3(__NR_write, ssize_t, _write, int, fd, const void*, buf, size_t, len);
 always_inline static syscall5(__NR_prctl, int, _prctl, int, option, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5);
 
+#define chmod(pathname, mode) _chmod(pathname, mode)
+#define execve(pathname, argv, envp) _execve(pathname, argv, envp)
 #define getegid() _getegid()
 #define geteuid() _geteuid()
 #define getgid() _getgid()
 #define getuid() _getuid()
+#define kill(pid, sig) _kill(pid, sig)
 #define personality(persona) _personality(persona)
-#define chmod(pathname, mode) _chmod(pathname, mode)
-#define stat(pathname, statbuf) _stat(pathname, statbuf)
-#define execve(pathname, argv, envp) _execve(pathname, argv, envp)
+#define prctl(option, arg2, arg3, arg4, arg5) _prctl(option, arg2, arg3, arg4, arg5)
 #define setresgid(rgid, egid, sgid) _setresgid(rgid, egid, sgid)
 #define setresuid(ruid, euid, suid) _setresuid(ruid, euid, suid)
-#define prctl(option, arg2, arg3, arg4, arg5) _prctl(option, arg2, arg3, arg4, arg5)
+#define stat(pathname, statbuf) _stat(pathname, statbuf)
+#define write(fd, buf, len) _write(fd, buf, len)
 
 #endif

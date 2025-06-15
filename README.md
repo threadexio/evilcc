@@ -7,7 +7,6 @@ which can be configured to:
 
 1. Run with the real uid/gid be set to the effective uid/gid.
 2. Disable ASLR completely.
-3. Override `LD_PRELOAD`.
 
 And this is done fully transparently to the rest of the code with minimal
 footprint.

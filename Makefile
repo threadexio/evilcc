@@ -1,6 +1,5 @@
 CC ?= cc
 AR ?= ar
-STRIP ?= strip
 NM ?= nm
 
 ARCH ?= $(shell uname -m)
@@ -81,8 +80,6 @@ $(O)/arch/$(ARCH)/evilcc.a: $(final-objs)
 	@mkdir -p $(dir $@)
 	@printf "  %-6s %s\n" "AR" "${@:$(O)/%=%}"
 	$(Q)$(AR) rcs $@ $^
-	@printf "  %-6s %s\n" "STRIP" "${@:$(O)/%=%}"
-	$(Q)$(STRIP) -N __evilcc_init $@
 	@printf "  %-6s %s\n" "NM" "${@:$(O)/%=%}"
 	$(Q)$(NM) --extern-only --defined-only $@
 
