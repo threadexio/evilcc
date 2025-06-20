@@ -4,22 +4,12 @@
 #include "compiler.h"
 #include "config.h"
 
-// IMPORTANT: BE VERY CAREFUL IN THIS FILE!
-//
-// Everything here is supported by thin strings of hope. All pointers wired up
-// correctly (I hope) and all offsets in perfect balance.
-//
-// Before you make any changes to this file, make sure you absoluterly know what
-// every single lines does.
-
 used static void __evilcc_init(int argc, const char* argv[], const char* envp[]);
 
 always_inline noreturn static void evilcc_finish(void) {
   asm volatile(
-    // The `+0x7b` is the exact offset needed to jump to the instruction below
-    // `jmp __evilcc_init` in `__evilcc_entry`. If this number and the code of
-    // `__evilcc_entry` do not match... prepare for unforeseen consequences.
-    "jmp " stringify(__EVILCC_ENTRY_SYMBOL) "+0x7b"
+    "lea __evilcc_init_ret(%%rip), %%rax\n"
+    "jmp *%%rax\n"
     :::
   );
 
@@ -76,6 +66,9 @@ asm (
   // instruction at the end of `__evilcc_init`.
   "sub $8, %rsp\n"
   "jmp __evilcc_init\n"
+
+  ".local __evilcc_init_ret\n"
+  "__evilcc_init_ret:\n"
 
   // Load the saved stack pointer.
   "lea __evilcc_stack(%rip), %rbx\n"
