@@ -80,10 +80,10 @@ The most basic way to use `evilcc` is like this:
 
 ```bash
 $ cc main.c -o main.o
-$ cc main.o evilcc/arch/x86_64/evilcc.a -o main -Wl,-e__evilcc_entry
+$ cc main.o evilcc/evilcc_x86_64.a -o main -Wl,-e__evilcc_entry
 ```
 
-The important parts are that you need to include the `ar` archive containing
+The important parts are that you need to include the `evilcc` object containing
 the `evilcc` code and to instruct the linker to set the entrypoint of the
 executable to `__evilcc_entry`. The latter is done with the `-Wl,-e` argument.
 
@@ -94,13 +94,13 @@ EVILCC := ../evilcc
 EVILCC_OUT := $(shell pwd)/build/evilcc
 EVILCC_CFLAGS :=
 
-main: main.o $(EVILCC_OUT)/arch/x86_64/evilcc.a
+main: main.o $(EVILCC_OUT)/evilcc_x86_64.o
 	$(CC) $^ -o $@ -Wl,-e__evilcc_entry $(LFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
-$(EVILCC_OUT)/arch/%/evilcc.a:
+$(EVILCC_OUT)/evilcc_%.o:
 	$(MAKE) -C $(EVILCC)/ O="$(EVILCC_OUT)" ARCH="$*" CFLAGS="$(EVILCC_CFLAGS)" build
 ```
 

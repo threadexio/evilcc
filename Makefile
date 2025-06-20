@@ -1,43 +1,27 @@
 CC ?= cc
-AR ?= ar
 NM ?= nm
+STRIP ?= strip
 
 ARCH ?= $(shell uname -m)
 V := 0
 O := .
 
+DEBUG ?=
+
 ###############################################################################
 
+arches := i386 x86_64
 
-arches := $(patsubst arch/%,%,$(wildcard arch/*))
+cflags := -Wall -Wextra -fPIC -fPIC -ffreestanding -nostartfiles -nostdlib -nodefaultlibs
+cflags-i386 := -m32
+cflags-x86_64 := -m64
+
+ifneq ($(DEBUG),)
+cflags += -D__EVILCC_DEBUG
+endif
+
 build-targets := $(addprefix build-,$(arches))
 clean-targets := $(addprefix clean-,$(arches))
-
-build-configs := $(shell find . -type f -name build.mk -printf '%P\n')
-
-final-cflags := $(CFLAGS)
-final-objs :=
-
-define source-build-config =
-cflags :=
-objs :=
-cflags-$$(ARCH) :=
-objs-$$(ARCH) :=
-
-include $(1)
-final-cflags += $$(cflags) $$(cflags-$$(ARCH))
-final-objs += $$(addprefix $$(O)/$$(dir $(1)), $$(objs) $$(objs-$$(ARCH)) )
-endef
-
-$(foreach x,$(build-configs),$(eval $(call source-build-config,$(x))))
-
-override CFLAGS := $(final-cflags)
-override OBJS := $(final-objs)
-undefine final-cflags final-objs
-
--include .config.mk
-
-###############################################################################
 
 ifeq ($(V),0)
 Q := @
@@ -45,19 +29,30 @@ else
 Q :=
 endif
 
+override CFLAGS += $(cflags) $(cflags-$(ARCH))
+
+###############################################################################
+
 all: build
 
+###############################################################################
+
 .PHONY:
-build: $(O)/arch/$(ARCH)/evilcc.a
+build: $(O)/evilcc_$(ARCH).o
+
+.PHONY:
+build-all: $(build-targets)
 
 .PHONY:
 $(build-targets):
 	$(Q)$(MAKE) ARCH=${@:build-%=%} build
 
+###############################################################################
+
 .PHONY:
 clean:
 	@printf "  %-6s %s\n" "CLEAN" "$(ARCH)"
-	$(Q)rm -f $(O)/arch/$(ARCH)/evilcc.a $(final-objs)
+	$(Q)rm -f $(O)/evilcc.a
 
 .PHONY:
 clean-all: $(clean-targets)
@@ -71,21 +66,21 @@ $(clean-targets):
 .PHONY:
 test: test/main-$(ARCH)
 
-test/main-$(ARCH):
-	$(Q)$(MAKE) -C test/ ARCH="$(ARCH)"
+test/main-%:
+	$(Q)$(MAKE) -C test/ ARCH="$*"
 
 ###############################################################################
 
-$(O)/arch/$(ARCH)/evilcc.a: $(final-objs)
-	@mkdir -p $(dir $@)
-	@printf "  %-6s %s\n" "AR" "${@:$(O)/%=%}"
-	$(Q)$(AR) rcs $@ $^
-	@printf "  %-6s %s\n" "NM" "${@:$(O)/%=%}"
-	$(Q)$(NM) --extern-only --defined-only $@
+$(O)/evilcc_%.o: src/init.c
+	@mkdir -p $(O)
+	@printf "  %-6s %s\n" "CC" "$@"
+	$(Q)$(CC) $(CFLAGS) -Isrc -c $^ -o $@
 
-.PRECIOUS: %.o
-$(O)/%.o: %.c
-	@printf "  %-6s %s\n" "CC" "${@:$(O)/%=%}"
-	@mkdir -p $(dir $@)
-	$(Q)$(CC) $(CFLAGS) -c $^ -o $@
-
+ifeq ($(DEBUG),)
+	@printf "  %-6s %s\n" "STRIP" "$@"
+	$(Q)$(NM) $@ \
+		| grep evilcc \
+		| grep -v __evilcc_entry \
+		| awk '{print "--strip-symbol=" $$NF}' \
+		| xargs $(STRIP) $@
+endif
