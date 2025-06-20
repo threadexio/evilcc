@@ -4,9 +4,11 @@
 #include "compiler.h"
 #include "config.h"
 
-used static void __evilcc_init(int argc, const char* argv[], const char* envp[]);
+typedef struct {} finish_token_t;
 
-always_inline noreturn static void evilcc_finish(void) {
+used static finish_token_t __evilcc_init(int argc, const char* argv[], const char* envp[]);
+
+always_inline noreturn static finish_token_t evilcc_finish(void) {
   asm volatile(
     "call __evilcc_get_pc\n"
     "add $(__evilcc_init_ret - .), %%eax\n"
