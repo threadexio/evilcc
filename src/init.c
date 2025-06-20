@@ -14,54 +14,85 @@ struct state {
   bool wants_reexec;
 };
 
-always_inline static void promote_uid(void) {
-#if defined(__EVILCC_PROMOTE_UID)
-  uid_t ruid = getuid();
-  uid_t euid = geteuid();
+always_inline static void do_setuid(struct state* state) {
+#if defined(__EVILCC_SETUID)
+  (void)state;
 
-  if (ruid != euid) {
-    log("promoting uid...");
-    if (setresuid(euid, euid, euid) != 0)
-      fatal("failed to set r/e/s Uid");
-  } else {
-    log("no need to promote uid");
-  }
+  uid_t target;
+
+  #if __EVILCC_SETUID < 0
+    target = geteuid();
+    log("set uid to: (effective)");
+  #else
+    target = __EVILCC_SETUID;
+    log("set uid to: " stringify(__EVILCC_SETUID));
+  #endif
+
+  if (setresuid(target, target, target) != 0)
+    fatal("failed to set uid");
+#else
+  (void)state;
 #endif
 }
 
-always_inline static void promote_gid(void) {
-#if defined(__EVILCC_PROMOTE_GID)
-  gid_t rgid = getgid();
-  gid_t egid = getegid();
+always_inline static void do_setgid(struct state* state) {
+#if defined(__EVILCC_SETGID)
+  (void)state;
 
-  if (rgid != egid) {
-    log("promoting gid...");
-    if (setresgid(egid, egid, egid) != 0)
-      fatal("failed to set r/e/s Gid");
-  } else {
-    log("no need to promote gid");
-  }
+  gid_t target;
+
+  #if __EVILCC_SETGID < 0
+    target = getegid();
+    log("set gid to: (effective)");
+  #else
+    target = __EVILCC_SETGID;
+    log("set gid to: " stringify(__EVILCC_SETGID));
+  #endif
+
+  if (setresgid(target, target, target) != 0)
+    fatal("failed to set gid");
+#else
+  (void)state;
 #endif
 }
 
-always_inline static void disable_aslr(struct state* state) {
-#if defined(__EVILCC_DISABLE_ASLR)
-  // The kernel silently discards `ADDR_NO_RANDOMIZE` from the personality of
-  // setuid/setgid binaries. This means we cannot just set `ADDR_NO_RANDOMIZE`
-  // and re-execute ourselves. We have to do a little dance to somehow
-  // re-execute without the setuid/setgid bits.
-  #if !defined(__EVILCC_DROP_SUGID_METHOD)
-    #error "__EVILCC_DISABLE_ASLR needs __EVILCC_DROP_SUGID_METHOD"
+always_inline static void do_personality(struct state* state) {
+#if defined(__EVILCC_PERSONALITY) || defined(__EVILCC_PERSONALITY_MASK)
+  // The kernel silently drops some personality flags when executing
+  // setuid/setgid binaries. For this reason, we have to do a little dance and
+  // somehow get the kernel to re-execute without the setuid/setgid bits.
+  #if defined(__EVILCC_PERSONALITY) && !defined(__EVILCC_DROP_SUGID)
+    #error "__EVILCC_PERSONALITY needs __EVILCC_DROP_SUGID"
   #endif
 
   int persona = personality(0xffffffff);
   if (persona == -1)
     fatal("failed to get personality");
 
-  if (persona & ADDR_NO_RANDOMIZE)
+  int desired = persona;
+
+  #if defined(__EVILCC_PERSONALITY_MASK)
+    // Disable all flags not allowed by the mask.
+    desired &= ~(__EVILCC_PERSONALITY_MASK);
+  #endif
+
+  #if defined(__EVILCC_PERSONALITY)
+    // Set any flags needed.
+    desired |= (__EVILCC_PERSONALITY);
+  #endif
+
+  if (persona == desired)
     return;
 
-  if (personality(persona | ADDR_NO_RANDOMIZE) != 0)
+  #if defined(__EVILCC_PERSONALITY_MASK)
+    log("personality: -" stringify(__EVILCC_PERSONALITY_MASK));
+  #endif
+  #if defined(__EVILCC_PERSONALITY)
+    log("personality: +" stringify(__EVILCC_PERSONALITY));
+  #endif
+
+  log("set personality");
+  if (personality(desired) == -1)
     fatal("failed to set personality");
 
   state->wants_reexec |= true;
@@ -71,42 +102,27 @@ always_inline static void disable_aslr(struct state* state) {
 }
 
 used static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
-#if 0
-  {
-    log("============================");
-    log("  evilcc");
-    log("============================");
-    log(" * argv:");
-    for (const char** p = argv; *p != NULL; p++)
-      log(*p);
-    log("");
-    log(" * envp:");
-    for (const char** p = envp; *p != NULL; p++)
-      log(*p);
-    log("--- start ---");
-  }
-#endif
-
 #if defined(__EVILCC_WAIT_DEBUGGER)
   #if !defined(__EVILCC_DEBUG)
     #error "__EVILCC_WAIT_DEBUGGER needs __EVILCC_DEBUG"
   #endif
-
   {
     log("waiting for debugger...");
     kill(0, SIGSTOP);
   }
 #endif
+
+  log("--- start ---");
   
   // Re-set the SUID and SGID bits if needed.
-#if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+#if __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
   struct stat stat = {0};
   if (statme(&stat) != 0)
     fatal("failed to stat self");
 
   {
     mode_t new_mode = stat.st_mode;
-    
+
   #if defined(__EVILCC_IS_SETUID)
     log("is setuid");
     new_mode |= S_ISUID;
@@ -136,19 +152,19 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
     .wants_reexec = false,
   };
 
-  promote_uid();
-  promote_gid();
-  disable_aslr(&state);
+  do_setuid(&state);
+  do_setgid(&state);
+  do_personality(&state);
 
   if (state.wants_reexec) {
-  #if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
+  #if __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_PRCTL
     // Tell the kernel not to respect the setuid/setgid bits from now on.
     //
     // See the `__EVILCC_DROP_SUGID_PRCTL` docs for implications.
     log("setting NO_NEW_PRIVS...");
     if (prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L) != 0)
       fatal("failed to set the NO_NEW_PRIVS flag");
-  #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+  #elif __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
     // Unset the problematic setuid and setgid bits temporarily.
     //
     // See the `__EVILCC_DROP_SUGID_CHMOD` docs for more.
@@ -160,7 +176,7 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
       log("no need to unset any setuid/setgid bits");
     }
   #endif
-    
+
     log("re-executing...");
     log("--- end ---");
     if (reexecve(state.argv, state.envp) != 0)

@@ -2,22 +2,31 @@
 #define __EVILCC_CONFIG_H
 
 ///////////////////////////////////////////////////////////////////////////////
-// General functionality toggles.
+// General functionality.
 ///////////////////////////////////////////////////////////////////////////////
 
-// The following macros are used to enable functionality.
+// The following macros are used to customize functionality.
 //
-//  * __EVILCC_PROMOTE_UID
+//  * __EVILCC_SETUID=<uid>
 //
-//    Promote the real (and saved) uid to the effective uid.
+//    Set the real, effective and saved uid to <uid>. If <uid> is < 0, then
+//    the real and saved uids are set to the effective uid. This can be used in
+//    combination with setuid executables to fully promote the running user.
 //
-//  * __EVILCC_PROMOTE_GID
+//  * __EVILCC_SETGID=<gid>
 //
-//    Promote the real (and saved) gid to the effective gid.
+//    Set the real, effective and saved gid to <gid>. If <gid> is < 0, then
+//    the real and saved gids are set to the effective gid. This can be used in
+//    combination with setgid executables to fully promote the running user.
 //
-//  * __EVILCC_DISABLE_ASLR
+//  * __EVILCC_PERSONALITY=<persona>
 //
-//    Run the program with `ADDR_NO_RANDOMIZE`.
+//    Add <persona> to the personality of the program.
+//
+//  * __EVILCC_PERSONALITY_MASK=<persona>
+//
+//    Remove <persona> from the personality of the program. Note:
+//    `__EVILCC_PERSONALITY` takes priority over this.
 
 ///////////////////////////////////////////////////////////////////////////////
 // Drop setuid/setgid bits.
@@ -25,7 +34,7 @@
 
 // 1. By using `prctl`.
 //
-//        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_PRCTL`
+//        `-D__EVILCC_DROP_SUGID=__EVILCC_DROP_SUGID_PRCTL`
 //
 //    Before re-executing we set the `NO_NEW_PRIVS` flag that tells the kernel
 //    not to respect setuid/setgid bits when executing other programs (including
@@ -43,7 +52,7 @@
 
 // 2. By using `chmod`.
 //
-//        `-D__EVILCC_DROP_SUGID_METHOD=__EVILCC_DROP_SUGID_CHMOD`
+//        `-D__EVILCC_DROP_SUGID=__EVILCC_DROP_SUGID_CHMOD`
 //
 //    Before re-executing we use `chmod` to unset the setuid/setgid bits
 //    from our binary, then we `execve` our own binary (which is now not
@@ -76,11 +85,11 @@
 //       setuid/setgid bits.
 #define __EVILCC_DROP_SUGID_CHMOD 6
 
-#if !defined(__EVILCC_DROP_SUGID_METHOD)
-#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
-#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
+#if !defined(__EVILCC_DROP_SUGID)
+#elif __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_PRCTL
+#elif __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
 #else
-  #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs"
+  #error "unknown __EVILCC_DROP_SUGID, see the docs"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

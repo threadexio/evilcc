@@ -5,8 +5,8 @@ A library-like alternate ELF entrypoint with super powers.
 This is a static library that provides a shim entrypoint for the executable
 which can be configured to:
 
-1. Run with the real uid/gid be set to the effective uid/gid.
-2. Disable ASLR completely.
+1. Run with the modified real/effective/saved uids/gids.
+2. Alter personality.
 
 And this is done fully transparently to the rest of the code with minimal
 footprint.
@@ -62,7 +62,7 @@ different.
 functionality of 1, `evilcc` must be built like this:
 
 ```bash
-$ make CFLAGS="-D__EVILCC_PROMOTE_UID" test
+$ make -C test/ CFLAGS="-D__EVILCC_SETUID=-1"
 $ ./test/main-x86_64
 ```
 
@@ -70,9 +70,8 @@ Since the test binary is marked setuid and owned by `root` you should see the
 real uid of the test binary is `0`, the same as the effective uid. Additionally,
 the real gid is unchanged but the effective gid is `0`. This is because the test
 binary is also marked as setgid but `evilcc` was not configured to promote the
-effective gid to the real gid. Disabling ASLR is done in the same way.
-Configuration flags and more docs are available in
-[`include/config.h`](./include/config.h).
+effective gid to the real gid. Configuration flags and more docs are available
+in [`src/config.h`](./src/config.h).
 
 ## Building with evilcc
 
@@ -80,7 +79,7 @@ The most basic way to use `evilcc` is like this:
 
 ```bash
 $ cc main.c -o main.o
-$ cc main.o evilcc/evilcc_x86_64.a -o main -Wl,-e__evilcc_entry
+$ cc main.o evilcc/evilcc_x86_64.o -o main -Wl,-e__evilcc_entry
 ```
 
 The important parts are that you need to include the `evilcc` object containing
