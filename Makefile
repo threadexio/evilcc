@@ -52,7 +52,7 @@ $(build-targets):
 .PHONY:
 clean:
 	@printf "  %-6s %s\n" "CLEAN" "$(ARCH)"
-	$(Q)rm -f $(O)/evilcc.a
+	$(Q)rm -f $(O)/evilcc_$(ARCH).o
 
 .PHONY:
 clean-all: $(clean-targets)
@@ -60,14 +60,6 @@ clean-all: $(clean-targets)
 .PHONY:
 $(clean-targets):
 	$(Q)$(MAKE) ARCH=${@:clean-%=%} clean
-
-###############################################################################
-
-.PHONY:
-test: test/main-$(ARCH)
-
-test/main-%:
-	$(Q)$(MAKE) -C test/ ARCH="$*"
 
 ###############################################################################
 
