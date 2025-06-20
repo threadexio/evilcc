@@ -4,9 +4,33 @@
 #include "compiler.h"
 #include "config.h"
 
+// IMPORTANT: BE VERY CAREFUL IN THIS FILE!
+//
+// Everything here is supported by thin strings of hope. All pointers wired up
+// correctly (I hope) and all offsets in perfect balance.
+//
+// Before you make any changes to this file, make sure you absoluterly know what
+// every single lines does.
+
 used static void __evilcc_init(int argc, const char* argv[], const char* envp[]);
 
+always_inline noreturn static void evilcc_finish(void) {
+  asm volatile(
+    // The `+0x7b` is the exact offset needed to jump to the instruction below
+    // `jmp __evilcc_init` in `__evilcc_entry`. If this number and the code of
+    // `__evilcc_entry` do not match... prepare for unforeseen consequences.
+    "jmp " stringify(__EVILCC_ENTRY_SYMBOL) "+0x7b"
+    :::
+  );
+
+  unreachable();
+}
+
 asm (
+  ".data\n"
+  ".local __evilcc_stack\n"
+  "__evilcc_stack: .quad 0\n"
+
   ".text\n"
   ".globl " stringify(__EVILCC_ENTRY_SYMBOL) "\n"
   stringify(__EVILCC_ENTRY_SYMBOL) ":\n"
@@ -29,11 +53,33 @@ asm (
   "movq %r15, -128(%rsp)\n"
   "sub $128, %rsp\n"
 
+  // Save the stack pointer for later. The state of the envrionment after
+  // execution returns to `__evilcc_entry` is all messed up (because
+  // `__evilcc_init` did not do any cleanup). We save the stack pointer to
+  // global variable so we can safely restore it and then the saved context of
+  // the CPU.
+  "lea __evilcc_stack(%rip), %rbx\n"
+  "mov %rsp, (%rbx)\n"
+
+  // Load the address of the stack before we saved our context.
   "lea 128(%rsp), %rbx\n"
+
+  // Prepare arguments.
   "mov 0(%rbx), %rdi\n"           // argc
   "lea 8(%rbx), %rsi\n"           // argv
   "lea 16(%rbx, %rdi, 8), %rdx\n" // envp
-  "call __evilcc_init\n"
+
+  // Add an extra 8 bytes as a dummy return address. This is needed because we
+  // are emulating a `call` instruction with a plain `jmp`. `__evilcc_init`
+  // expects to be given execution from a `call`, so we have to emulate adding
+  // a return address to the stack. We need to do this to avoid having a `ret`
+  // instruction at the end of `__evilcc_init`.
+  "sub $8, %rsp\n"
+  "jmp __evilcc_init\n"
+
+  // Load the saved stack pointer.
+  "lea __evilcc_stack(%rip), %rbx\n"
+  "mov (%rbx), %rsp\n"
 
   "add $128, %rsp\n"
   "movq   -8(%rsp), %rax\n"

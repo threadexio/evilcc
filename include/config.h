@@ -76,10 +76,11 @@
 //       setuid/setgid bits.
 #define __EVILCC_DROP_SUGID_CHMOD 6
 
-#if __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
+#if !defined(__EVILCC_DROP_SUGID_METHOD)
+#elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_PRCTL
 #elif __EVILCC_DROP_SUGID_METHOD == __EVILCC_DROP_SUGID_CHMOD
 #else
-#error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs for available methods"
+  #error "unknown __EVILCC_DROP_SUGID_METHOD, see the docs"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////

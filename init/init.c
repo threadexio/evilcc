@@ -71,6 +71,7 @@ always_inline static void disable_aslr(struct state* state) {
 }
 
 used static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
+#if 0
   {
     log("============================");
     log("  evilcc");
@@ -84,6 +85,7 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
       log(*p);
     log("--- start ---");
   }
+#endif
 
 #if defined(__EVILCC_WAIT_DEBUGGER)
   #if !defined(__EVILCC_DEBUG)
@@ -168,4 +170,6 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
     log("jump to main program");
     log("--- end ---");
   }
+
+  evilcc_finish();
 }

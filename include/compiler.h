@@ -4,8 +4,10 @@
 #define stringify(x) stringify_(x)
 #define stringify_(x) #x
 
-#define naked         __attribute__((naked))
-#define used          __attribute__((used))
+#define naked    __attribute__((naked))
+#define used     __attribute__((used))
+#define noreturn __attribute__((noreturn))
+
 #define unreachable() __builtin_unreachable()
 #define breakpoint()  asm volatile("int3")
 
