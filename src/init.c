@@ -101,7 +101,7 @@ always_inline static void do_personality(struct state* state) {
 #endif
 }
 
-used static finish_token_t __evilcc_init(int argc, const char* argv[], const char* envp[]) {
+used static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
 #if defined(__EVILCC_WAIT_DEBUGGER)
   #if !defined(__EVILCC_DEBUG)
     #error "__EVILCC_WAIT_DEBUGGER needs __EVILCC_DEBUG"
@@ -113,6 +113,10 @@ used static finish_token_t __evilcc_init(int argc, const char* argv[], const cha
 #endif
 
   log("--- start ---");
+
+  log("argv:");
+  for (const char** p = argv; *p != NULL; p++)
+    log(*p);
   
   // Re-set the SUID and SGID bits if needed.
 #if __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
