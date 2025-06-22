@@ -1,0 +1,326 @@
+#!/usr/bin/env bash
+set -eu -o pipefail
+D=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+stderr=2
+
+verbose=0
+
+if [ -t "$stderr" ]; then
+  styled_output=1
+else
+  styled_output=0
+fi
+
+RESET="0"
+BOLD="1"
+DIM="2"
+IT="3"
+UND="4"
+BRIGHT_RED="91"
+BRIGHT_GREEN="92"
+BRIGHT_YELLOW="93"
+BRIGHT_MAGENTA="95"
+
+style() {
+  if [ "$styled_output" -eq 1 ]; then
+    local x=""
+
+    while
+      x="${x};${!1}"
+      shift
+
+      [ ! -z "${1:-}" ]
+    do true; done
+
+    printf "\e[${x}m"
+  fi
+}
+
+styled() {
+  local s="$1"
+  shift
+
+  style "$@"
+  printf "%s" "$s"
+  style RESET
+}
+
+warn() {
+  printf "$(styled "[evilcc]" BOLD BRIGHT_YELLOW) $(style BOLD)%s$(style RESET)\n" "$1" >&"$stderr"
+}
+
+error() {
+  printf "$(styled "[evilcc]" BOLD BRIGHT_RED) $(style BOLD)%s$(style RESET)\n" "$1" >&"$stderr"
+}
+
+run() {
+  if [ "$verbose" -eq 1 ]; then
+    echo "$(styled "=>" BOLD) $(style BRIGHT_MAGENTA)$@$(style RESET)"
+  fi
+
+  "$@"
+}
+
+fatal() {
+  error "$@"
+  exit 1
+}
+
+###############################################################################
+
+usage() {
+  option() {
+    printf "  %-34s %s\n" "$1" "$2"
+    shift 2
+    while [ ! -z "${1:-}" ]; do
+      printf "%36s %s\n" "" "$1"
+      shift 1
+    done
+  }
+  
+  printf "$(styled "Usage:" UND) $0 [options] file…\n"
+  printf "\n"
+  printf "$(styled "Options:" UND)\n"
+  option "--verbose" "Be more verbose."
+  printf "\n"
+  option "--setuid <uid>" "Set the real/effective/saved uid to <uid>." \
+                          "  If <uid> is -1, then the real and saved uid" \
+                          "  are set to the effective uid."
+  option "--setgid <gid>" "Set the real/effective/saved gid to <gid>." \
+                          "  If <gid> is -1, then the real and saved gid" \
+                          "  are set to the effective gid."
+  option "--personality-add <persona>" "Add these personality flags."
+  option "--personality-remove <persona>" "Remove these personality flags."
+  option "--drop-sugid <method>" "Drop the setuid/setgid bits with this method." \
+                                 " • methods: $(styled "prctl" DIM), $(styled "chmod" DIM)"
+  printf "\n"
+  option "--debug" "Compile $(styled "evilcc" UND) in debug mode."
+  option "--wait-for-debugger" "Instruct $(styled "evilcc" UND) to pause execution until a" \
+                               "debugger is attached."
+  printf "\n"
+  option "--entry-symbol <symbol>" "Change the name of the $(styled "evilcc" UND) entrypoint."
+  option "--real-entry-symbol <symbol>" "Instruct $(styled "evilcc" UND) to jump to this symbol when it" \
+                                        "finishes."
+  printf "\n"
+  option "--[option]" "Any options not specified above will be passed" \
+                    "to the underlying compiler."
+  option "+--[option]" "Any options prefixed with '+' will be passed to" \
+                     "the underlying compiler as-is." \
+                     " • This can be used to pass --setuid to the" \
+                     "   underlying compiler instead of to $(styled "evilcc" UND)."
+}
+
+###############################################################################
+
+strip="${STRIP:-strip}"
+nm="${NM:-nm}"
+
+cc=
+flags=()
+args=()
+
+setuid=
+setgid=
+personality_add=()
+personality_remove=()
+drop_sugid=
+debug=0
+wait_for_debugger=0
+entry_symbol="__evilcc_entry"
+real_entry_symbol=
+
+is_exe=1
+will_link=1
+out=
+
+while [ ! -z "${1:-}" ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+
+    --verbose)
+      verbose=1
+      shift
+      ;;
+
+    --setuid)
+      [ -z "${2:-}" ] && fatal "--setuid needs a value"
+      setuid="$2"
+      shift 2
+      ;;
+
+    --setgid)
+      [ -z "${2:-}" ] && fatal "--setgid needs a value"
+      setgid="$2"
+      shift 2
+      ;;
+
+    --personality-add)
+      [ -z "${2:-}" ] && fatal "--personality-add needs a value"
+      personality_add+=("$2")
+      shift 2
+      ;;
+
+    --personality-remove)
+      [ -z "${2:-}" ] && fatal "--personality-remove needs a value"
+      personality_remove+=("$2")
+      shift 2
+      ;;
+
+    --drop-sugid)
+      [ -z "${2:-}" ] && fatal "--drop-sugid needs a value"
+
+      case "$2" in
+        prctl) ;;
+        chmod) ;;
+        *) fatal "invalid value for --drop-sugid. see --help";;
+      esac
+
+      drop_sugid="$2"
+      shift 2
+      ;;
+
+    --debug)
+      debug=1
+      shift
+      ;;
+
+    --wait-for-debugger)
+      wait_for_debugger=1
+      shift
+      ;;
+
+    --entry-symbol)
+      [ -z "${2:-}" ] && fatal "--entry-symbol needs a value"
+      entry_symbol="$2"
+      shift 2
+      ;;
+
+    --real-entry-symbol)
+      [ -z "${2:-}" ] && fatal "--real-entry-symbol needs a value"
+      real_entry_symbol="$2"
+      shift 2
+      ;;
+
+    -c)
+      will_link=0
+      flags+=("$1")
+      shift
+      ;;
+
+    -shared)
+      is_exe=0
+      flags+=("$1")
+      shift
+      ;;
+
+    -o)
+      [ -z "${2:-}" ] && fatal "-o needs a value"
+      out="$2"
+      shift 2
+      ;;
+
+    +-*)
+      flags+=("${1:1}")
+      shift
+      ;;
+
+    -*)
+      flags+=("$1")
+      shift
+      ;;
+
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+###############################################################################
+
+if [ -z "$cc" ]; then
+  if [ ! -z "${_CC:-}" ]; then
+    cc="$_CC"
+  else
+    warn "_CC is not set. falling back to 'cc'"
+    cc="cc"
+  fi
+fi
+
+###############################################################################
+
+if [ "$will_link" -eq 1 ] && [ "$is_exe" -eq 1 ]; then
+  evilcc_flags+=(
+    "-Wall" "-Wextra"
+    "-fPIC" "-fPIE"
+    "-ffreestanding" "-nostartfiles" "-nostdlib" "-nodefaultlibs"
+  )
+
+  if [ ! -z "$setuid" ]; then
+    evilcc_flags+=("-D__EVILCC_SETUID=${setuid}")
+  fi
+
+  if [ ! -z "$setgid" ]; then
+    evilcc_flags+=("-D__EVILCC_SETGID=${setgid}")
+  fi
+
+  if [ "${#personality_add[@]}" -gt 0 ]; then
+    old_ifs="$IFS"
+    IFS='|'
+    evilcc_flags+=("-D__EVILCC_PERSONALITY=$(printf "%s" "${personality_add[*]}")")
+    IFS="$old_ifs"
+  fi
+
+  if [ "${#personality_remove[@]}" -gt 0 ]; then
+    old_ifs="$IFS"
+    IFS='|'
+    evilcc_flags+=("-D__EVILCC_PERSONALITY_MASK=\"$(printf "%s" "${personality_remove[*]}")\"")
+    IFS="$old_ifs"
+  fi
+
+  if [ ! -z "$drop_sugid" ]; then
+    evilcc_flags+=("-D__EVILCC_DROP_SUGID=__EVILCC_DROP_SUGID_${drop_sugid^^}")
+  fi
+
+  if [ "$debug" -eq 1 ]; then
+    evilcc_flags+=("-D__EVILCC_DEBUG")
+  fi
+
+  if [ "$wait_for_debugger" -eq 1 ]; then
+    evilcc_flags+=("-D__EVILCC_WAIT_DEBUGGER")
+  fi
+
+  evilcc_flags+=("-D__EVILCC_ENTRY_SYMBOL=${entry_symbol}")
+
+  if [ ! -z "$real_entry_symbol" ];  then
+    evilcc_flags+=("-D__EVILCC_REAL_ENTRY_SYMBOL=${real_entry_symbol}")
+  fi
+
+  evilcc_obj="$(mktemp -u -t evilcc.XXXXXXXXXX.o)"
+
+  run "$cc" "${flags[@]}" "${evilcc_flags[@]}" -I"${D}/src" -c "${D}/src/init.c" -o "${evilcc_obj}"
+
+  if [ "$debug" -eq 0 ]; then
+    run "$strip" "${evilcc_obj}" $("$nm" "${evilcc_obj}" | awk "
+\$NF ~ /${entry_symbol}/ { next }
+\$NF ~ /evilcc/ { print \"--strip-symbol=\" \$NF }
+" | xargs)
+  fi
+
+  flags+=("-Wl,-e$entry_symbol")
+  args+=("${evilcc_obj}")
+fi
+
+###############################################################################
+
+cmd=("$cc" "${flags[@]}" "${args[@]}")
+
+if [ ! -z "${out}" ]; then
+  cmd+=("-o" "${out}")
+fi
+
+run "${cmd[@]}"

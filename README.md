@@ -50,8 +50,8 @@ execution to the "real" entrypoint of the executable (`_start`). After
 2. Build the test binary.
 
 ```bash
-$ make test
-$ ./test/main-x86_64
+$ make -C test
+$ ./test/build/main
 ```
 
 The test binary prints some diagnostic information about the environment and
@@ -62,8 +62,8 @@ different.
 functionality of 1, `evilcc` must be built like this:
 
 ```bash
-$ make -C test/ CFLAGS="-D__EVILCC_SETUID=-1"
-$ ./test/main-x86_64
+$ make -C test/ CFLAGS="--setuid -1"
+$ ./test/build/main
 ```
 
 Since the test binary is marked setuid and owned by `root` you should see the
@@ -76,6 +76,14 @@ in [`src/config.h`](./src/config.h).
 ## Building with evilcc
 
 The most basic way to use `evilcc` is like this:
+
+```bash
+$ ./evilcc main.c -o main
+```
+
+`evilcc` is a compiler wrapper script that automatically bundles in `evilcc`.
+It is also possible to use `evilcc` without this wrapper script by doing the
+following:
 
 ```bash
 $ cc main.c -o main.o
@@ -113,7 +121,10 @@ $ nm <executable> | grep __evilcc
 ```
 
 If there are symbols named that, then it's probably correctly linked in. You can
-also verify that the entrypoint is set correctly with `readelf`.
+also verify that the entrypoint is set correctly with `readelf`. A better way
+to check would be to compile `evilcc` in debug mode and run the final executable
+once. If `evilcc` is linked in correctly, then it should print some debugging
+messages in the programs stderr.
 
 The build of `evilcc` itself can be configured with the `CFLAGS` parameter
 passed to `make`. For example, to compile with PIC you do: `make CFLAGS="-fPIC"`

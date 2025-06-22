@@ -1,16 +1,14 @@
-ARCH := $(shell uname -m)
-O := $(shell pwd)/out
+export _CC := $(CC)
+CC := ../evilcc
 
+all: build/main build/libevil.so
 
-all: main-$(ARCH) libevil-$(ARCH).so
-
-main-$(ARCH): main.c $(O)/evilcc_$(ARCH).o
-	$(CC) $(CFLAGS) $^ -o $@ -Wl,-e__evilcc_entry
+build/main: main.c
+	mkdir -p build
+	$(CC) $(CFLAGS) $^ -o $@
 	sudo chown -v root:root $@
 	sudo chmod -v u+rws,g+rs,o+rx $@
 
-libevil-$(ARCH).so: evil.c
+build/libevil.so: evil.c
+	mkdir -p build
 	$(CC) $(CFLAGS) -shared -fPIC $^ -o $@
-
-$(O)/evilcc_$(ARCH).o:
-	$(MAKE) -C ../ O="$(O)" ARCH="$(ARCH)" build

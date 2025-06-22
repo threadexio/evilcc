@@ -1,6 +1,6 @@
 *.o
 *.a
 
-/out
-/build
-/compile_flags.txt
+out
+build
+compile_flags.txt
