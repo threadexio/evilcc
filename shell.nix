@@ -4,9 +4,8 @@
 
 pkgs.mkShell {
   packages = with pkgs; [
-    gcc_multi
+    gcc
     gnumake
-    patchelf
-    entr
+    gdb
   ];
 }

@@ -9,6 +9,10 @@
 #include "arch/i386/entry.h"
 #include "arch/i386/misc.h"
 #include "arch/i386/syscalls.h"
+#elif defined(__aarch64__)
+#include "arch/aarch64/entry.h"
+#include "arch/aarch64/misc.h"
+#include "arch/aarch64/syscalls.h"
 #else
 #error "unsupported architecture"
 #endif

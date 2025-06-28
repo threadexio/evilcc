@@ -1,0 +1,31 @@
+set architecture aarch64
+set endian little
+target remote localhost:1234
+
+define regs
+    printf "x0:  %016lx  x1:  %016lx  x2:  %016lx  x3:  %016lx\n", $x0,  $x1,  $x2,  $x3
+    printf "x4:  %016lx  x5:  %016lx  x6:  %016lx  x7:  %016lx\n", $x4,  $x5,  $x6,  $x7
+    printf "x8:  %016lx  x9:  %016lx  x10: %016lx  x11: %016lx\n", $x8,  $x9,  $x10, $x11
+    printf "x12: %016lx  x13: %016lx  x14: %016lx  x15: %016lx\n", $x12, $x13, $x14, $x15
+    printf "x16: %016lx  x17: %016lx  x18: %016lx  x19: %016lx\n", $x16, $x17, $x18, $x19
+    printf "x20: %016lx  x21: %016lx  x22: %016lx  x23: %016lx\n", $x20, $x21, $x22, $x23
+    printf "x24: %016lx  x25: %016lx  x26: %016lx  x27: %016lx\n", $x24, $x25, $x26, $x27
+    printf "x28: %016lx  x29: %016lx  x30: %016lx  x31: %016lx\n", $x28, $x29, $x30, $x31
+    printf "sp:  %016lx\n", $sp
+end
+
+define report
+    disassemble
+    regs
+    x/8gx $sp
+end
+
+define ni2
+    ni
+    report
+end
+
+b *__evilcc_entry+0
+c
+
+report
