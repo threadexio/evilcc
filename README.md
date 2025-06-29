@@ -34,6 +34,8 @@ architectures are supported:
 * [x] `i386`
 * [x] `x86_64`
 * [x] `aarch64`
+* [x] `riscv32`
+* [x] `riscv64`
 
 ## How it works
 
