@@ -18,7 +18,7 @@ used always_inline noreturn static void evilcc_finish(void) {
 asm (
   ".data\n"
   ".local __evilcc_stack\n"
-  "__evilcc_stack: .quad 0\n"
+  "__evilcc_stack: .double 0\n"
 
   ".text\n"
   ".globl " stringify(__EVILCC_ENTRY_SYMBOL) "\n"
