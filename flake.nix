@@ -35,6 +35,7 @@
           cross_i386 = mkShell pkgs.pkgsCross.i686-linux;
           cross_aarch64 = mkShell pkgs.pkgsCross.aarch64-multiplatform;
           cross_riscv32 = mkShell pkgs.pkgsCross.riscv32;
+          cross_riscv64 = mkShell pkgs.pkgsCross.riscv64;
         };
       }
     );

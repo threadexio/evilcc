@@ -30,6 +30,10 @@
 #include "arch/riscv32/entry.h"
 #include "arch/riscv32/misc.h"
 #include "arch/riscv32/syscalls.h"
+#elif defined(__riscv) && __riscv_xlen == 64
+#include "arch/riscv64/entry.h"
+#include "arch/riscv64/misc.h"
+#include "arch/riscv64/syscalls.h"
 #else
 #error "unsupported architecture"
 #endif
