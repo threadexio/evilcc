@@ -1,326 +1,421 @@
-#!/usr/bin/env bash
-set -eu -o pipefail
-D=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
-stderr=2
-
-verbose=0
-
-if [ -t "$stderr" ]; then
-  styled_output=1
-else
-  styled_output=0
-fi
-
-RESET="0"
-BOLD="1"
-DIM="2"
-IT="3"
-UND="4"
-BRIGHT_RED="91"
-BRIGHT_GREEN="92"
-BRIGHT_YELLOW="93"
-BRIGHT_MAGENTA="95"
-
-style() {
-  if [ "$styled_output" -eq 1 ]; then
-    local x=""
-
-    while
-      x="${x};${!1}"
-      shift
-
-      [ ! -z "${1:-}" ]
-    do true; done
-
-    printf "\e[${x}m"
-  fi
-}
-
-styled() {
-  local s="$1"
-  shift
-
-  style "$@"
-  printf "%s" "$s"
-  style RESET
-}
-
-warn() {
-  printf "$(styled "[evilcc]" BOLD BRIGHT_YELLOW) $(style BOLD)%s$(style RESET)\n" "$1" >&"$stderr"
-}
-
-error() {
-  printf "$(styled "[evilcc]" BOLD BRIGHT_RED) $(style BOLD)%s$(style RESET)\n" "$1" >&"$stderr"
-}
-
-run() {
-  if [ "$verbose" -eq 1 ]; then
-    echo "$(styled "=>" BOLD) $(style BRIGHT_MAGENTA)$@$(style RESET)"
-  fi
-
-  "$@"
-}
-
-fatal() {
-  error "$@"
-  exit 1
-}
+#!/usr/bin/env python3
+from typing import *
+import subprocess
+import tempfile
+import sys
+import os
 
 ###############################################################################
 
-usage() {
-  option() {
-    printf "  %-34s %s\n" "$1" "$2"
-    shift 2
-    while [ ! -z "${1:-}" ]; do
-      printf "%36s %s\n" "" "$1"
-      shift 1
-    done
-  }
-  
-  printf "$(styled "Usage:" UND) $0 [options] file…\n"
-  printf "\n"
-  printf "$(styled "Options:" UND)\n"
-  option "--verbose" "Be more verbose."
-  printf "\n"
-  option "--setuid <uid>" "Set the real/effective/saved uid to <uid>." \
-                          "  If <uid> is -1, then the real and saved uid" \
-                          "  are set to the effective uid."
-  option "--setgid <gid>" "Set the real/effective/saved gid to <gid>." \
-                          "  If <gid> is -1, then the real and saved gid" \
-                          "  are set to the effective gid."
-  option "--personality-add <persona>" "Add these personality flags."
-  option "--personality-remove <persona>" "Remove these personality flags."
-  option "--drop-sugid <method>" "Drop the setuid/setgid bits with this method." \
-                                 " • methods: $(styled "prctl" DIM), $(styled "chmod" DIM)"
-  printf "\n"
-  option "--debug" "Compile $(styled "evilcc" UND) in debug mode."
-  option "--wait-for-debugger" "Instruct $(styled "evilcc" UND) to pause execution until a" \
-                               "debugger is attached."
-  printf "\n"
-  option "--entry-symbol <symbol>" "Change the name of the $(styled "evilcc" UND) entrypoint."
-  option "--real-entry-symbol <symbol>" "Instruct $(styled "evilcc" UND) to jump to this symbol when it" \
-                                        "finishes."
-  printf "\n"
-  option "--[option]" "Any options not specified above will be passed" \
-                    "to the underlying compiler."
-  option "+--[option]" "Any options prefixed with '+' will be passed to" \
-                     "the underlying compiler as-is." \
-                     " • This can be used to pass --setuid to the" \
-                     "   underlying compiler instead of to $(styled "evilcc" UND)."
-}
+VERBOSE = False
+OUTPUT = sys.stderr
+OUTPUT_TTY = OUTPUT.isatty()
+
+class styled:
+    _x: str
+    _modes: List[str]
+
+    def __init__(self, x: str):
+        self._x = x
+        self._modes = []
+
+    def _with_mode(self, mode: str) -> Self:
+        self._modes.append(mode)
+        return self
+
+    def __str__(self) -> str:
+        global OUTPUT_TTY
+
+        if OUTPUT_TTY:
+            return f"\033[{';'.join(self._modes)}m{self._x}\033[0m"
+        else:
+            return f"{self._x}"
+
+    def __len__(self) -> int:
+        return len(self._x)
+
+    def __repr__(self) -> str:
+        return repr(self._x)
+
+    def bold(self) -> Self:
+        return self._with_mode("1")
+
+    def dim(self) -> Self:
+        return self._with_mode("2")
+
+    def italic(self) -> Self:
+        return self._with_mode("3")
+
+    def underline(self) -> Self:
+        return self._with_mode("4")
+
+    def bright_red(self) -> Self:
+        return self._with_mode("91")
+
+    def bright_green(self) -> Self:
+        return self._with_mode("92")
+
+    def bright_yellow(self) -> Self:
+        return self._with_mode("93")
+
+    def bright_magenta(self) -> Self:
+        return self._with_mode("95")
 
 ###############################################################################
 
-strip="${STRIP:-strip}"
-nm="${NM:-nm}"
+def _log(prefix, msg: str):
+    lines = iter(msg.splitlines())
 
-cc=
-flags=()
-args=()
+    print(f"{prefix} {next(lines)}", file=OUTPUT)
 
-setuid=
-setgid=
-personality_add=()
-personality_remove=()
-drop_sugid=
-debug=0
-wait_for_debugger=0
-entry_symbol="__evilcc_entry"
-real_entry_symbol=
+    gutter = len(prefix)
+    for line in lines:
+        print(" " * gutter + f" {line}", file=OUTPUT)
 
-is_exe=1
-will_link=1
-out=
+def info(msg: str):
+    global VERBOSE
+    if VERBOSE:
+        _log(styled("[evilcc]").bold().bright_green(), msg)
 
-while [ ! -z "${1:-}" ]; do
-  case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
+def warn(msg: str):
+    _log(styled("[evilcc]").bold().bright_yellow(), msg)
 
-    --verbose)
-      verbose=1
-      shift
-      ;;
+def error(msg: str):
+    _log(styled("[evilcc]").bold().bright_red(), msg)
 
-    --setuid)
-      [ -z "${2:-}" ] && fatal "--setuid needs a value"
-      setuid="$2"
-      shift 2
-      ;;
+def fatal(msg: str):
+    error(msg)
+    exit(1)
 
-    --setgid)
-      [ -z "${2:-}" ] && fatal "--setgid needs a value"
-      setgid="$2"
-      shift 2
-      ;;
+def pager(content: str):
+    if OUTPUT_TTY:
+        try:
+            pager = os.environ.get("PAGER") or "less"
+            subprocess.run([pager, "-R"], input=content,encoding="utf-8")
+            return
+        except:
+            pass
 
-    --personality-add)
-      [ -z "${2:-}" ] && fatal "--personality-add needs a value"
-      personality_add+=("$2")
-      shift 2
-      ;;
+    print(content, file=OUTPUT)
 
-    --personality-remove)
-      [ -z "${2:-}" ] && fatal "--personality-remove needs a value"
-      personality_remove+=("$2")
-      shift 2
-      ;;
+def run(argv: List[str], **kwargs) -> subprocess.CompletedProcess[str]:
+    info("running: " + ' '.join(map(lambda x: f"'{styled(x).bold().bright_magenta()}'", argv)))
 
-    --drop-sugid)
-      [ -z "${2:-}" ] && fatal "--drop-sugid needs a value"
-
-      case "$2" in
-        prctl) ;;
-        chmod) ;;
-        *) fatal "invalid value for --drop-sugid. see --help";;
-      esac
-
-      drop_sugid="$2"
-      shift 2
-      ;;
-
-    --debug)
-      debug=1
-      shift
-      ;;
-
-    --wait-for-debugger)
-      wait_for_debugger=1
-      shift
-      ;;
-
-    --entry-symbol)
-      [ -z "${2:-}" ] && fatal "--entry-symbol needs a value"
-      entry_symbol="$2"
-      shift 2
-      ;;
-
-    --real-entry-symbol)
-      [ -z "${2:-}" ] && fatal "--real-entry-symbol needs a value"
-      real_entry_symbol="$2"
-      shift 2
-      ;;
-
-    -c)
-      will_link=0
-      flags+=("$1")
-      shift
-      ;;
-
-    -shared)
-      is_exe=0
-      flags+=("$1")
-      shift
-      ;;
-
-    -o)
-      [ -z "${2:-}" ] && fatal "-o needs a value"
-      out="$2"
-      shift 2
-      ;;
-
-    +-*)
-      flags+=("${1:1}")
-      shift
-      ;;
-
-    -*)
-      flags+=("$1")
-      shift
-      ;;
-
-    *)
-      args+=("$1")
-      shift
-      ;;
-  esac
-done
+    try:
+        return subprocess.run(argv, check=True, **kwargs)
+    except subprocess.CalledProcessError as e:
+        cmd_str = ' '.join(map(lambda x: f"'{styled(x).bold().bright_magenta()}'", argv))
+        fatal(f"command: {cmd_str} exited with code: {e.returncode}")
 
 ###############################################################################
 
-if [ -z "$cc" ]; then
-  if [ ! -z "${_CC:-}" ]; then
-    cc="$_CC"
-  else
-    warn "_CC is not set. falling back to 'cc'"
-    cc="cc"
-  fi
-fi
+class ArgNotFoundError(Exception):
+    pass
+
+class ArgValueNotFoundError(Exception):
+    pass
+
+class ArgsIter:
+    def __init__(self, args: List[str]):
+        self._args = args
+        self._i = 0
+
+    def peek(self) -> str:
+        try:
+            return self._args[self._i]
+        except IndexError:
+            raise ArgNotFoundError()
+
+    def next(self) -> str:
+        x = self.peek()
+        self._i += 1
+        return x
+
+    def value(self, type: Callable[[str], Any]=str) -> Any:
+        try:
+            return type(self.next())
+        except ArgNotFoundError:
+            raise ArgValueNotFoundError()
+
+class Config:
+    def __init__(self, argv: List[str] = sys.argv):
+        self.setuid: Optional[int] = None
+        self.setgid: Optional[int] = None
+        self.personality_add: List[str] = []
+        self.personality_remove: List[str] = []
+        self.drop_sugid: Optional[str] = None
+        self.is_setuid: bool = False
+        self.is_setgid: bool = False
+        self.debug: bool = False
+        self.wait_for_debugger: bool = False
+        self.entry_symbol: str = "__evilcc_entry"
+        self.real_entry_symbol: Optional[str] = None
+
+        self.sysroot: str = os.path.dirname(__file__)
+
+        self.will_link: bool = True
+        self.is_exe: bool = True
+        self.out: Optional[str] = None
+
+        self.cc: str = None
+        self.flags: List[str] = []
+        self.args: List[str] = []
+
+        self.nm: str = None
+        self.strip: str = None
+
+        self._parse_args(argv)
+
+        if self.cc is None:
+            self.cc = os.environ.get("_CC")
+            if self.cc is None:
+                warn("_CC is not set. falling back to 'cc'")
+                self.cc = "cc"
+
+        if self.nm is None:
+            self.nm = os.environ.get("NM") or "nm"
+
+        if self.strip is None:
+            self.strip = os.environ.get("STRIP") or "strip"
+
+    def _parse_args(self, argv):
+        args = ArgsIter(argv[1:])
+
+        while True:
+            try:
+                arg = args.next()
+            except ArgNotFoundError:
+                break
+
+            if arg.startswith("+"):
+                if arg.startswith("-"):
+                    self.flags.append(arg[1:])
+                else:
+                    self.args.append(arg[1:])
+                continue
+
+            match arg:
+                case "-h" | "--help":
+                    self._print_usage(argv)
+                    exit(0)
+
+                case "--verbose":
+                    global VERBOSE
+                    VERBOSE = True
+
+                case "--setuid":
+                    try:
+                        uid = args.value(int)
+                        self.setuid = uid
+                    except ArgValueNotFoundError:
+                        fatal("--setuid needs a value")
+
+                case "--setgid":
+                    try:
+                        gid = args.value(int)
+                        self.setgid = gid
+                    except ArgValueNotFoundError:
+                        fatal("--setgid needs a value")
+
+                case "--personality-add":
+                    try:
+                        persona = args.value(str)
+                        self.personality_add.append(persona)
+                    except ArgValueNotFoundError:
+                        fatal("--personality-add needs a value")
+
+                case "--personaliy-remove":
+                    try:
+                        persona = args.value(str)
+                        self.personality_remove.append(persona)
+                    except ArgValueNotFoundError:
+                        fatal("--personality-remove needs a value")
+
+                case "--drop-sugid":
+                    try:
+                        method = args.value(str)
+                        if method not in ["prctl", "chmod"]:
+                            fatal("invalid value for --drop-sugid. see --help")
+                        self.drop_sugid = method
+                    except ArgValueNotFoundError:
+                        fatal("--drop-sugid needs a value")
+
+                case "--is-setuid":
+                    self.is_setuid = True
+
+                case "--is-setgid":
+                    self.is_setgid = True
+
+                case "--debug":
+                    self.debug = True
+
+                case "--wait-for-debugger":
+                    self.wait_for_debugger = True
+
+                case "--entry-symbol":
+                    try:
+                        self.entry_symbol = args.value(str)
+                    except ArgValueNotFoundError:
+                        fatal("--entry-symbol needs a value")
+
+                case "--real-entry-symbol":
+                    try:
+                        self.real_entry_symbol = args.value(str)
+                    except ArgValueNotFoundError:
+                        fatal("--real-entry-symbol needs a value")
+
+                case "--sysroot":
+                    try:
+                        self.sysroot = args.value(str)
+                    except ArgValueNotFoundError:
+                        fatal("--sysroot needs a value")
+
+                case "-c":
+                    self.will_link = False
+                    self.flags.append("-c")
+
+                case "-shared":
+                    self.is_exe = False
+                    self.flags.append("-shared")
+
+                case "-o":
+                    try:
+                        self.out = args.value(str)
+                    except ArgValueNotFoundError:
+                        fatal("-o needs a value")
+
+                case _:
+                    if arg.startswith("-"):
+                        self.flags.append(arg)
+                    else:
+                        self.args.append(arg)
+
+    def _print_usage(self, argv):
+        uid = styled('<uid>').dim().italic()
+        gid = styled('<gid>').dim().italic()
+        persona = styled('<persona>').dim().italic()
+        method = styled('<method>').dim().italic()
+        symbol = styled('<symbol>').dim().italic()
+        path = styled('<path>').dim().italic()
+
+        pager(f"""{styled('Usage:').underline()} {styled(argv[0]).bright_magenta()} [options] file…
+
+{styled('Options:').underline()}
+  --verbose                         Be more verbose.
+
+  --setuid {uid}                    Set the real/effective/saved uids to {uid}.
+                                     • If {uid} < 0, then the real and saved
+                                       uids are set to the effective uid.
+  --setgid {gid}                    Set the real/effective/saved gids to {gid}.
+                                     • If {gid} < 0, then the real and saved
+                                       gids are set to the effective gid.
+  --personality-add {persona}       Add these personality flags.
+  --personality-remove {persona}    Remove these personality flags.
+
+  --drop-sugid {method}             Drop the setuid/setgid bits when re-executing.
+                                     • methods: {styled('prctl').bright_magenta()}, {styled('chmod').bright_magenta()}
+  --is-setuid                       Instruct evilcc to re-set the setuid bit of
+                                    the executable when re-executing.
+                                    (only applies if: {styled('--drop-sugid chmod').dim()})
+  --is-setgid                       Instruct evilcc to re-set the setgid bit of
+                                    the executable when re-executing.
+                                    (only applies if: {styled('--drop-sugid chmod').dim()})
+
+  --debug                           Compile evilcc in debug mode.
+  --wait-for-debugger               Fire {styled('SIGSTOP').underline()} on startup to allow attaching
+                                    with a debugger.
+
+  --entry-symbol {symbol}           Change the name of the evillcc entrypoint.
+  --real-entry-symbol {symbol}      Instruct evilcc to jump to this symbol after
+                                    it finishes.
+
+  --sysroot {path}                  Specify the path to the evilcc repo root.
+
+  -<option>                         Any other options will be passed to the
+                                    underlying compiler.
+  +<arg>                            Arguments prefixed with '+' will be passed
+                                    to the underlying compiler. This takes
+                                    priority over all options above.
+""")
+
+def build_evilcc(config: Config) -> str:
+
+    build_cmd = [
+        config.cc,
+        "-Wall", "-Wextra",
+        "-fPIC", "-fPIE",
+        "-ffreestanding", "-nostartfiles", "-nostdlib", "-nodefaultlibs",
+    ] + config.flags
+
+    if config.setuid is not None:
+        build_cmd.append(f"-D__EVILCC_SETUID={config.setuid}")
+
+    if config.setgid is not None:
+        build_cmd.append(f"-D__EVILCC_SETGID={config.setgid}")
+
+    if len(config.personality_add) > 0:
+        build_cmd.append(f"-D__EVILCC_PERSONALITY={'|'.join(config.personality_add)}")
+
+    if len(config.personality_remove) > 0:
+        build_cmd.append(f"-D__EVILCC_PERSONALITY_MASK={'|'.join(config.personality_remove)}")
+
+    if config.drop_sugid is not None:
+        build_cmd.append(f"-D__EVILCC_DROP_SUGID=__EVILCC_DROP_SUGID_{config.drop_sugid.upper()}")
+
+    if config.is_setuid:
+        build_cmd.append("-D__EVILCC_IS_SETUID")
+
+    if config.is_setgid:
+        build_cmd.append("-D__EVILCC_IS_SETGID")
+
+    if config.debug:
+        build_cmd.append("-D__EVILCC_DEBUG")
+
+    if config.wait_for_debugger:
+        build_cmd.append("-D__EVILCC_WAIT_FOR_DEBUGGER")
+
+    if config.entry_symbol is not None:
+        build_cmd.append(f"-D__EVILCC_ENTRY_SYMBOL={config.entry_symbol}")
+
+    if config.real_entry_symbol is not None:
+        build_cmd.append(f"-D__EVILCC_REAL_ENTRY_SYMBOL={config.real_entry_symbol}")
+
+    out = tempfile.mktemp(suffix=".o", prefix="evilcc.")
+
+    build_cmd.extend([
+        f"-I{config.sysroot}/src",
+        "-c", f"{config.sysroot}/src/init.c",
+        "-o", out
+    ])
+
+    run(build_cmd)
+
+    if not config.debug:
+        symbols = map(lambda line: line.split()[-1], run([config.nm, out], stdout=subprocess.PIPE).stdout.decode("ascii").splitlines())
+
+        strip_cmd = [config.strip] + list(map(lambda sym: f"--strip-symbol={sym}", filter(lambda sym: "evilcc" in sym and sym != config.entry_symbol, symbols))) + [out]
+        run(strip_cmd)
+
+    info(f"built evilcc at: {styled(out).bold().bright_magenta()}")
+    return out
 
 ###############################################################################
 
-if [ "$will_link" -eq 1 ] && [ "$is_exe" -eq 1 ]; then
-  evilcc_flags+=(
-    "-Wall" "-Wextra"
-    "-fPIC" "-fPIE"
-    "-ffreestanding" "-nostartfiles" "-nostdlib" "-nodefaultlibs"
-  )
+def main():
+    config = Config()
+    info(f"sysroot: {config.sysroot}")
 
-  if [ ! -z "$setuid" ]; then
-    evilcc_flags+=("-D__EVILCC_SETUID=${setuid}")
-  fi
+    if config.will_link and config.is_exe:
+        out = build_evilcc(config)
+        config.flags.append(f"-Wl,-e{config.entry_symbol}")
+        config.args.append(out)
 
-  if [ ! -z "$setgid" ]; then
-    evilcc_flags+=("-D__EVILCC_SETGID=${setgid}")
-  fi
+    cmd = [config.cc] + config.flags + config.args
 
-  if [ "${#personality_add[@]}" -gt 0 ]; then
-    old_ifs="$IFS"
-    IFS='|'
-    evilcc_flags+=("-D__EVILCC_PERSONALITY=$(printf "%s" "${personality_add[*]}")")
-    IFS="$old_ifs"
-  fi
+    if config.out is not None:
+        cmd.extend(["-o", config.out])
 
-  if [ "${#personality_remove[@]}" -gt 0 ]; then
-    old_ifs="$IFS"
-    IFS='|'
-    evilcc_flags+=("-D__EVILCC_PERSONALITY_MASK=\"$(printf "%s" "${personality_remove[*]}")\"")
-    IFS="$old_ifs"
-  fi
+    run(cmd)
 
-  if [ ! -z "$drop_sugid" ]; then
-    evilcc_flags+=("-D__EVILCC_DROP_SUGID=__EVILCC_DROP_SUGID_${drop_sugid^^}")
-  fi
-
-  if [ "$debug" -eq 1 ]; then
-    evilcc_flags+=("-D__EVILCC_DEBUG")
-  fi
-
-  if [ "$wait_for_debugger" -eq 1 ]; then
-    evilcc_flags+=("-D__EVILCC_WAIT_DEBUGGER")
-  fi
-
-  evilcc_flags+=("-D__EVILCC_ENTRY_SYMBOL=${entry_symbol}")
-
-  if [ ! -z "$real_entry_symbol" ];  then
-    evilcc_flags+=("-D__EVILCC_REAL_ENTRY_SYMBOL=${real_entry_symbol}")
-  fi
-
-  evilcc_obj="$(mktemp -u -t evilcc.XXXXXXXXXX.o)"
-
-  run "$cc" "${flags[@]}" "${evilcc_flags[@]}" -I"${D}/src" -c "${D}/src/init.c" -o "${evilcc_obj}"
-
-  if [ "$debug" -eq 0 ]; then
-    run "$strip" "${evilcc_obj}" $("$nm" "${evilcc_obj}" | awk "
-\$NF ~ /${entry_symbol}/ { next }
-\$NF ~ /evilcc/ { print \"--strip-symbol=\" \$NF }
-" | xargs)
-  fi
-
-  flags+=("-Wl,-e$entry_symbol")
-  args+=("${evilcc_obj}")
-fi
-
-###############################################################################
-
-cmd=("$cc" "${flags[@]}" "${args[@]}")
-
-if [ ! -z "${out}" ]; then
-  cmd+=("-o" "${out}")
-fi
-
-run "${cmd[@]}"
+if __name__ == "__main__":
+    main()
