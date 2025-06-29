@@ -98,22 +98,12 @@ always_inline static void do_personality(struct state* state) {
 }
 
 used static void __evilcc_init(int argc, const char* argv[], const char* envp[]) {
-#if defined(__EVILCC_WAIT_DEBUGGER)
-  #if !defined(__EVILCC_DEBUG)
-    #error "__EVILCC_WAIT_DEBUGGER needs __EVILCC_DEBUG"
-  #endif
-  {
-    log("waiting for debugger...");
-    kill(0, SIGSTOP);
-  }
+  log("--- start ---");
+#if defined(__EVILCC_WAIT_FOR_DEBUGGER)
+  log("waiting for debugger...");
+  kill(0, SIGSTOP);
 #endif
 
-  log("--- start ---");
-
-  log("argv:");
-  for (const char** p = argv; *p != NULL; p++)
-    log(*p);
-  
   // Re-set the SUID and SGID bits if needed.
 #if __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
   struct statx stat = {0};
