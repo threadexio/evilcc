@@ -13,7 +13,7 @@
           packages =
             # Host tools
             (with pkgs.buildPackages; [
-              gcc
+              (if pkgs.system == "x86_64-linux" then gcc_multi else gcc)
               gnumake
               python3
               gdb
