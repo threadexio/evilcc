@@ -9,23 +9,31 @@
   outputs = { nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-
-        mkDevShell = pkgs: pkgs.mkShell {
-          packages = with pkgs; [
-            gcc
-            gnumake
-            gdb
-          ];
+        mkShell = pkgs: pkgs.mkShell {
+          packages =
+            # Host tools
+            (with pkgs.buildPackages; [
+              gcc
+              gnumake
+              python3
+              gdb
+            ])
+            # Target toolchain
+            ++
+            (with pkgs; [
+              stdenv.cc
+            ]);
         };
+
+        pkgs = import nixpkgs { inherit system; };
       in
       {
         devShells = {
-          default = mkDevShell pkgs;
+          default = mkShell pkgs;
 
-          cross_x86_64 = mkDevShell pkgs.pkgsCross.x86_64-linux;
-          cross_i386 = mkDevShell pkgs.pkgsCross.i686-linux;
-          cross_aarch64 = mkDevShell pkgs.pkgsCross.aarch64-multiplatform;
+          cross_x86_64 = mkShell pkgs.pkgsCross.x86_64-linux;
+          cross_i386 = mkShell pkgs.pkgsCross.i686-linux;
+          cross_aarch64 = mkShell pkgs.pkgsCross.aarch64-multiplatform;
         };
       }
     );
