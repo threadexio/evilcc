@@ -2,10 +2,6 @@
 #include "config.h"
 #include "log.h"
 
-#define chmodme(mode) chmod("/proc/self/exe", mode)
-#define statme(statbuf) stat("/proc/self/exe", statbuf)
-#define reexecve(argv, envp) execve("/proc/self/exe", argv, envp)
-
 struct state {
   int argc;
   const char** argv;
@@ -120,12 +116,12 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
   
   // Re-set the SUID and SGID bits if needed.
 #if __EVILCC_DROP_SUGID == __EVILCC_DROP_SUGID_CHMOD
-  struct stat stat = {0};
-  if (statme(&stat) != 0)
+  struct statx stat = {0};
+  if (statx(AT_FDCWD, "/proc/self/exe", 0, STATX_MODE, &stat) != 0)
     fatal("failed to stat self");
 
   {
-    mode_t new_mode = stat.st_mode;
+    mode_t new_mode = stat.stx_mode;
 
   #if defined(__EVILCC_IS_SETUID)
     log("is setuid");
@@ -137,11 +133,11 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
     new_mode |= S_ISGID;
   #endif
 
-    if (new_mode != stat.st_mode) {
+    if (new_mode != stat.stx_mode) {
       log("re-setting setuid/setgid bits");
 
-      stat.st_mode = new_mode;
-      if (chmodme(stat.st_mode) != 0)
+      stat.stx_mode = new_mode;
+      if (fchmodat(AT_FDCWD, "/proc/self/exe", stat.stx_mode) != 0)
         fatal("failed to re-set the setuid/setgid bits of self");
     } else {
       log("no need to re-set setuid/setgid bits");
@@ -172,9 +168,9 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
     // Unset the problematic setuid and setgid bits temporarily.
     //
     // See the `__EVILCC_DROP_SUGID_CHMOD` docs for more.
-    if (stat.st_mode & (S_ISUID | S_ISGID)) {
+    if (stat.stx_mode & (S_ISUID | S_ISGID)) {
       log("unsetting setuid/setgid bits of self...");
-      if (chmodme(stat.st_mode & ~S_ISUID & ~S_ISGID) != 0)
+      if (fchmodat(AT_FDCWD, "/proc/self/exe", stat.stx_mode & ~S_ISUID & ~S_ISGID) != 0)
         fatal("failed to unset setuid/setgid bits of self");
     } else {
       log("no need to unset any setuid/setgid bits");
@@ -183,7 +179,7 @@ used static void __evilcc_init(int argc, const char* argv[], const char* envp[])
 
     log("re-executing...");
     log("--- end ---");
-    if (reexecve(state.argv, state.envp) != 0)
+    if (execve("/proc/self/exe", state.argv, state.envp) != 0)
       fatal("failed to re-execute self");
   } else {
     // Fallthrough to the actual program.
