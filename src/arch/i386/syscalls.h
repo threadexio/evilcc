@@ -110,8 +110,8 @@ always_inline static syscall0(__NR_getuid, uid_t, __evilcc_getuid);
 
 #define getegid() __evilcc_getegid()
 #define geteuid() __evilcc_geteuid()
-#define getgid() __evilcc_getgid()
-#define getuid() __evilcc_getuid()
+#define getgid()  __evilcc_getgid()
+#define getuid()  __evilcc_getuid()
 
 ///////////////////////////////////////////////////////////////////////////////
 
