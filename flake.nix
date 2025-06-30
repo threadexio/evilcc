@@ -26,6 +26,8 @@
         };
 
         pkgs = import nixpkgs { inherit system; };
+
+        evilcc = pkgs.callPackage ./package.nix {};
       in
       {
         devShells = {
@@ -36,6 +38,12 @@
           cross_aarch64 = mkShell pkgs.pkgsCross.aarch64-multiplatform;
           cross_riscv32 = mkShell pkgs.pkgsCross.riscv32;
           cross_riscv64 = mkShell pkgs.pkgsCross.riscv64;
+        };
+
+        packages.default = evilcc;
+
+        overlays.default = _: _: {
+          inherit evilcc;
         };
       }
     );

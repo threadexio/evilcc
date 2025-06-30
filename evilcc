@@ -7,6 +7,8 @@ import os
 
 ###############################################################################
 
+DEFAULT_SYSROOT = os.path.dirname(__file__)
+
 VERBOSE = False
 OUTPUT = sys.stderr
 OUTPUT_TTY = OUTPUT.isatty()
@@ -109,34 +111,6 @@ def run(argv: List[str], **kwargs) -> subprocess.CompletedProcess[str]:
 
 ###############################################################################
 
-class ArgNotFoundError(Exception):
-    pass
-
-class ArgValueNotFoundError(Exception):
-    pass
-
-class ArgsIter:
-    def __init__(self, args: List[str]):
-        self._args = args
-        self._i = 0
-
-    def peek(self) -> str:
-        try:
-            return self._args[self._i]
-        except IndexError:
-            raise ArgNotFoundError()
-
-    def next(self) -> str:
-        x = self.peek()
-        self._i += 1
-        return x
-
-    def value(self, type: Callable[[str], Any]=str) -> Any:
-        try:
-            return type(self.next())
-        except ArgNotFoundError:
-            raise ArgValueNotFoundError()
-
 class Config:
     def __init__(self, argv: List[str] = sys.argv):
         self.setuid: Optional[int] = None
@@ -151,7 +125,7 @@ class Config:
         self.entry_symbol: str = "__evilcc_entry"
         self.real_entry_symbol: Optional[str] = None
 
-        self.sysroot: str = os.path.dirname(__file__)
+        self.sysroot: str = DEFAULT_SYSROOT
 
         self.will_link: bool = True
         self.is_exe: bool = True
@@ -179,12 +153,12 @@ class Config:
             self.strip = os.environ.get("STRIP") or "strip"
 
     def _parse_args(self, argv):
-        args = ArgsIter(argv[1:])
+        args = iter(argv[1:])
 
         while True:
             try:
-                arg = args.next()
-            except ArgNotFoundError:
+                arg = next(args)
+            except StopIteration:
                 break
 
             if arg.startswith("+"):
@@ -205,39 +179,37 @@ class Config:
 
                 case "--setuid":
                     try:
-                        uid = args.value(int)
-                        self.setuid = uid
-                    except ArgValueNotFoundError:
+                        self.setuid = int(next(args))
+                    except StopIteration:
                         fatal("--setuid needs a value")
 
                 case "--setgid":
                     try:
-                        gid = args.value(int)
-                        self.setgid = gid
-                    except ArgValueNotFoundError:
+                        self.setgid = int(next(args))
+                    except StopIteration:
                         fatal("--setgid needs a value")
 
                 case "--personality-add":
                     try:
-                        persona = args.value(str)
+                        persona = next(args)
                         self.personality_add.append(persona)
-                    except ArgValueNotFoundError:
+                    except StopIteration:
                         fatal("--personality-add needs a value")
 
                 case "--personaliy-remove":
                     try:
-                        persona = args.value(str)
+                        persona = next(args)
                         self.personality_remove.append(persona)
-                    except ArgValueNotFoundError:
+                    except StopIteration:
                         fatal("--personality-remove needs a value")
 
                 case "--drop-sugid":
                     try:
-                        method = args.value(str)
+                        method = next(args)
                         if method not in ["prctl", "chmod"]:
                             fatal("invalid value for --drop-sugid. see --help")
                         self.drop_sugid = method
-                    except ArgValueNotFoundError:
+                    except StopIteration:
                         fatal("--drop-sugid needs a value")
 
                 case "--is-setuid":
@@ -254,20 +226,20 @@ class Config:
 
                 case "--entry-symbol":
                     try:
-                        self.entry_symbol = args.value(str)
-                    except ArgValueNotFoundError:
+                        self.entry_symbol = next(args)
+                    except StopIteration:
                         fatal("--entry-symbol needs a value")
 
                 case "--real-entry-symbol":
                     try:
-                        self.real_entry_symbol = args.value(str)
-                    except ArgValueNotFoundError:
+                        self.real_entry_symbol = next(args)
+                    except StopIteration:
                         fatal("--real-entry-symbol needs a value")
 
                 case "--sysroot":
                     try:
-                        self.sysroot = args.value(str)
-                    except ArgValueNotFoundError:
+                        self.sysroot = next(args)
+                    except StopIteration:
                         fatal("--sysroot needs a value")
 
                 case "-c":
@@ -280,7 +252,7 @@ class Config:
 
                 case "-o":
                     try:
-                        self.out = args.value(str)
+                        self.out = next(args)
                     except ArgValueNotFoundError:
                         fatal("-o needs a value")
 
